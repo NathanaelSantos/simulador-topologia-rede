@@ -475,9 +475,9 @@
       user-select: none;
     }
     .host .device-icon { background: linear-gradient(145deg, #1e40af, #3b82f6); }
-    .dhcp .device-icon { background: linear-gradient(145deg, #9a3412, #f59e0b); }
     .switch .device-icon,
-    .router .device-icon {
+    .router .device-icon,
+    .dhcp .device-icon {
       background: transparent;
       box-shadow: none;
       border: none;
@@ -2862,7 +2862,7 @@
     el.style.top = dev.y + 'px';
     const iconHtml = {
       host: '🖥️',
-      dhcp: '📦',
+      dhcp: '<img src="imgs/data-storage.png" alt="Servidor DHCP" draggable="false">',
       switch: '<img src="imgs/network-switch.png" alt="Switch" draggable="false">',
       router: '<img src="imgs/roteador.png" alt="Roteador" draggable="false">'
     };
