@@ -476,11 +476,21 @@
     }
     .host .device-icon { background: linear-gradient(145deg, #1e40af, #3b82f6); }
     .switch .device-icon,
-    .router .device-icon,
-    .dhcp .device-icon {
+    .router .device-icon {
       background: transparent;
       box-shadow: none;
       border: none;
+    }
+    /* Servidor DHCP (imgs/data-storage.png tem fundo preto) */
+    .dhcp .device-icon {
+      background: #0f172a;
+      box-shadow: 0 2px 8px rgba(15, 23, 42, 0.18);
+      border: 1px solid #334155;
+    }
+    .dhcp .device-icon img {
+      width: 58px;
+      height: 58px;
+      object-fit: contain;
     }
     .dhcp-lease-box {
       border: 1px solid #fde68a;
@@ -2854,23 +2864,39 @@
     if (state.mode === 'connect') updateConnectUI();
   }
 
+  /** Ícones dos dispositivos (cache-bust na imagem do DHCP) */
+  const DEVICE_ICON_HTML = {
+    host: '🖥️',
+    dhcp: '<img src="imgs/data-storage.png?v=3" alt="Servidor DHCP" width="56" height="56" draggable="false">',
+    switch: '<img src="imgs/network-switch.png" alt="Switch" draggable="false">',
+    router: '<img src="imgs/roteador.png" alt="Roteador" draggable="false">'
+  };
+
   function renderDevice(dev) {
+    // recria o nó se já existir (garante ícone atualizado ao recarregar topologia)
+    const old = document.getElementById(dev.id);
+    if (old) old.remove();
+
     const el = document.createElement('div');
     el.className = `device ${dev.type}`;
     el.id = dev.id;
     el.style.left = dev.x + 'px';
     el.style.top = dev.y + 'px';
-    const iconHtml = {
-      host: '🖥️',
-      dhcp: '<img src="imgs/data-storage.png" alt="Servidor DHCP" draggable="false">',
-      switch: '<img src="imgs/network-switch.png" alt="Switch" draggable="false">',
-      router: '<img src="imgs/roteador.png" alt="Roteador" draggable="false">'
-    };
+    const icon = DEVICE_ICON_HTML[dev.type] || '❓';
     el.innerHTML = `
-      <div class="device-icon">${iconHtml[dev.type]}</div>
+      <div class="device-icon">${icon}</div>
       <div class="device-label">${dev.label}</div>
       <div class="device-ip" id="ip-${dev.id}"></div>
     `;
+    // se a imagem do DHCP falhar, tenta caminho absoluto a partir do HTML
+    const img = el.querySelector('.device-icon img');
+    if (img && dev.type === 'dhcp') {
+      img.addEventListener('error', () => {
+        const base = document.baseURI || window.location.href;
+        const url = new URL('imgs/data-storage.png', base).href + '?v=3';
+        if (img.src !== url) img.src = url;
+      }, { once: true });
+    }
     el.addEventListener('mousedown', e => {
       if (e.button !== 0) return;
       e.stopPropagation();
