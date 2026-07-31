@@ -1,0 +1,13 @@
+# OS / editor
+Thumbs.db
+Desktop.ini
+.DS_Store
+*.swp
+.idea/
+.vscode/
+
+# logs e deps locais
+node_modules/
+*.log
+.env
+.env.*

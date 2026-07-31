@@ -1,0 +1,4753 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Simulador de Topologia de Rede - UC1</title>
+  <style>
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+    body {
+      font-family: 'Segoe UI', system-ui, sans-serif;
+      background: #ffffff;
+      color: #1e293b;
+      height: 100vh;
+      overflow: hidden;
+    }
+    .toolbar {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 8px;
+      padding: 10px 14px;
+      background: #ffffff;
+      border-bottom: 1px solid #e2e8f0;
+      align-items: center;
+    }
+    .toolbar h1 {
+      font-size: 1.05rem;
+      font-weight: 600;
+      color: #1d4ed8;
+      margin-right: 12px;
+    }
+    .toolbar-sep {
+      width: 1px;
+      height: 24px;
+      background: #cbd5e1;
+      margin: 0 4px;
+    }
+    button {
+      background: #3b82f6;
+      color: white;
+      border: none;
+      padding: 7px 14px;
+      border-radius: 6px;
+      cursor: pointer;
+      font-size: 0.875rem;
+      font-weight: 500;
+      transition: background 0.15s, box-shadow 0.15s;
+    }
+    button:hover { background: #2563eb; }
+    button.active {
+      background: #10b981;
+      box-shadow: 0 0 0 2px rgba(16, 185, 129, 0.35);
+    }
+    button.danger { background: #dc2626; }
+    button.danger:hover { background: #b91c1c; }
+    button.secondary { background: #e2e8f0; color: #334155; }
+    button.secondary:hover { background: #cbd5e1; color: #1e293b; }
+    button.secondary.active {
+      background: #059669;
+      color: #fff;
+      box-shadow: 0 0 0 2px rgba(16, 185, 129, 0.4), 0 0 12px rgba(16, 185, 129, 0.25);
+      animation: pulse-btn 1.5s ease-in-out infinite;
+    }
+    @keyframes pulse-btn {
+      0%, 100% { box-shadow: 0 0 0 2px rgba(16, 185, 129, 0.4), 0 0 10px rgba(16, 185, 129, 0.2); }
+      50% { box-shadow: 0 0 0 3px rgba(16, 185, 129, 0.55), 0 0 16px rgba(16, 185, 129, 0.35); }
+    }
+    button.save-btn { background: #7c3aed; }
+    button.save-btn:hover { background: #6d28d9; }
+    button.warn-btn { background: #d97706; }
+    button.warn-btn:hover { background: #b45309; }
+    .save-status {
+      font-size: 0.72rem;
+      color: #64748b;
+      margin-left: 4px;
+      white-space: nowrap;
+    }
+    .save-status.saved { color: #059669; }
+    .save-status.dirty { color: #d97706; }
+    .main {
+      display: flex;
+      height: calc(100vh - 52px);
+    }
+    .sidebar {
+      width: 340px;
+      background: #ffffff;
+      border-right: 1px solid #e2e8f0;
+      display: flex;
+      flex-direction: column;
+      overflow: hidden;
+    }
+    .properties {
+      padding: 14px;
+      flex: 1 1 auto;
+      min-height: 80px;
+      overflow-y: auto;
+      border-bottom: none;
+      background: #ffffff;
+    }
+    .properties h3 {
+      font-size: 0.95rem;
+      color: #1d4ed8;
+      margin-bottom: 10px;
+    }
+    .properties h4 {
+      font-size: 0.85rem;
+      color: #475569;
+      margin: 12px 0 6px;
+    }
+    .properties label {
+      display: block;
+      font-size: 0.75rem;
+      color: #64748b;
+      margin-top: 6px;
+    }
+    .properties input, .properties select {
+      width: 100%;
+      padding: 6px 8px;
+      margin-top: 3px;
+      background: #ffffff;
+      border: 1px solid #cbd5e1;
+      border-radius: 4px;
+      color: #1e293b;
+      font-size: 0.85rem;
+    }
+    .properties input:focus, .properties select:focus {
+      outline: none;
+      border-color: #3b82f6;
+      box-shadow: 0 0 0 3px rgba(59, 130, 246, 0.15);
+    }
+    .properties input.invalid {
+      border-color: #ef4444;
+      background: #fef2f2;
+    }
+    .prop-error {
+      font-size: 0.72rem;
+      color: #dc2626;
+      margin-top: 6px;
+      line-height: 1.35;
+    }
+    .iface-box {
+      border: 1px solid #e2e8f0;
+      border-radius: 6px;
+      padding: 8px;
+      margin-bottom: 8px;
+      background: #f8fafc;
+    }
+    .iface-box strong {
+      font-size: 0.8rem;
+      color: #334155;
+    }
+    .iface-status {
+      font-size: 0.7rem;
+      color: #64748b;
+    }
+    .iface-status.connected { color: #059669; }
+    .sidebar-splitter {
+      flex: 0 0 6px;
+      height: 6px;
+      cursor: row-resize;
+      background: #e2e8f0;
+      position: relative;
+      z-index: 5;
+      transition: background 0.15s;
+      touch-action: none;
+    }
+    .sidebar-splitter::after {
+      content: '';
+      position: absolute;
+      left: 50%;
+      top: 50%;
+      transform: translate(-50%, -50%);
+      width: 36px;
+      height: 2px;
+      border-radius: 2px;
+      background: #94a3b8;
+      pointer-events: none;
+      transition: background 0.15s, width 0.15s;
+    }
+    .sidebar-splitter:hover,
+    .sidebar-splitter.active {
+      background: #3b82f6;
+    }
+    .sidebar-splitter:hover::after,
+    .sidebar-splitter.active::after {
+      background: #dbeafe;
+      width: 48px;
+    }
+    body.sidebar-resizing {
+      cursor: row-resize !important;
+      user-select: none !important;
+    }
+    body.sidebar-resizing * {
+      cursor: row-resize !important;
+    }
+    .validation-section {
+      padding: 8px 10px 10px;
+      flex: 0 0 auto;
+      min-height: 56px;
+      overflow: hidden;
+      display: flex;
+      flex-direction: column;
+      background: #ffffff;
+    }
+    .validation-section h3 {
+      font-size: 0.75rem;
+      color: #475569;
+      margin-bottom: 4px;
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      gap: 6px;
+      flex-shrink: 0;
+    }
+    .validation-section h3 button {
+      padding: 2px 6px;
+      font-size: 0.65rem;
+    }
+    .val-badge {
+      font-size: 0.6rem;
+      padding: 1px 6px;
+      border-radius: 999px;
+      font-weight: 600;
+    }
+    .val-badge.ok { background: #d1fae5; color: #047857; }
+    .val-badge.err { background: #fee2e2; color: #b91c1c; }
+    .val-badge.warn { background: #fef3c7; color: #b45309; }
+    #validation-list {
+      overflow-y: auto;
+      flex: 1;
+      min-height: 0;
+      font-size: 0.68rem;
+      line-height: 1.3;
+    }
+    .val-item {
+      padding: 3px 6px;
+      border-radius: 3px;
+      margin-bottom: 3px;
+      background: #f8fafc;
+      border-left: 2px solid #94a3b8;
+      color: #475569;
+    }
+    .val-item.err { border-left-color: #ef4444; color: #b91c1c; background: #fef2f2; }
+    .val-item.warn { border-left-color: #f59e0b; color: #b45309; background: #fffbeb; }
+    .val-item.ok { border-left-color: #10b981; color: #047857; background: #ecfdf5; }
+    .log-section {
+      padding: 8px 10px 10px;
+      flex: 0 0 auto;
+      min-height: 56px;
+      display: flex;
+      flex-direction: column;
+      overflow: hidden;
+      background: #ffffff;
+    }
+    .log-section h3 {
+      font-size: 0.75rem;
+      color: #475569;
+      margin-bottom: 4px;
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      gap: 6px;
+      flex-shrink: 0;
+    }
+    .log-section h3 button {
+      padding: 2px 6px;
+      font-size: 0.65rem;
+    }
+    #log {
+      flex: 1;
+      min-height: 0;
+      background: #f8fafc;
+      border: 1px solid #e2e8f0;
+      border-radius: 4px;
+      padding: 5px 6px;
+      overflow-y: auto;
+      font-family: 'Consolas', 'Courier New', monospace;
+      font-size: 0.68rem;
+      line-height: 1.3;
+      color: #475569;
+    }
+    #log .ok { color: #059669; }
+    #log .err { color: #dc2626; }
+    #log .info { color: #2563eb; }
+    #log .action { color: #7c3aed; }
+    #log .warn { color: #d97706; }
+    .canvas-container {
+      flex: 1;
+      position: relative;
+      background: #ffffff;
+      background-image:
+        radial-gradient(circle at 1px 1px, #e2e8f0 1px, transparent 0);
+      background-size: 24px 24px;
+      overflow: hidden;
+      transition: box-shadow 0.2s, background-color 0.2s;
+      cursor: default;
+    }
+    .canvas-container.panning {
+      cursor: grabbing;
+    }
+    .canvas-container.space-pan {
+      cursor: grab;
+    }
+    .canvas-container.connect-mode {
+      box-shadow: inset 0 0 0 3px #10b981, inset 0 0 40px rgba(16, 185, 129, 0.08);
+      cursor: crosshair;
+    }
+    .canvas-container.connect-mode .device {
+      cursor: pointer;
+    }
+    .canvas-world {
+      position: absolute;
+      top: 0;
+      left: 0;
+      width: 1px;
+      height: 1px;
+      transform-origin: 0 0;
+      will-change: transform;
+    }
+    .canvas-controls {
+      position: absolute;
+      right: 12px;
+      top: 12px;
+      z-index: 70;
+      display: flex;
+      flex-direction: column;
+      gap: 6px;
+      align-items: stretch;
+      pointer-events: auto;
+    }
+    .canvas-controls .zoom-row {
+      display: flex;
+      gap: 4px;
+      background: #ffffff;
+      border: 1px solid #e2e8f0;
+      border-radius: 8px;
+      padding: 4px;
+      box-shadow: 0 4px 14px rgba(15, 23, 42, 0.08);
+    }
+    .canvas-controls button {
+      padding: 6px 10px;
+      font-size: 0.78rem;
+      min-width: 34px;
+      background: #f8fafc;
+      color: #334155;
+      border: 1px solid #e2e8f0;
+    }
+    .canvas-controls button:hover {
+      background: #eff6ff;
+      color: #1d4ed8;
+      border-color: #bfdbfe;
+    }
+    .canvas-controls .zoom-label {
+      min-width: 52px;
+      text-align: center;
+      font-size: 0.72rem;
+      font-weight: 600;
+      color: #475569;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      padding: 0 4px;
+      user-select: none;
+    }
+    .canvas-controls .ctrl-hint {
+      font-size: 0.62rem;
+      color: #94a3b8;
+      text-align: right;
+      line-height: 1.25;
+      max-width: 160px;
+      background: rgba(255,255,255,0.9);
+      border-radius: 6px;
+      padding: 4px 6px;
+      border: 1px solid #f1f5f9;
+    }
+    .connect-banner {
+      display: none;
+      position: absolute;
+      top: 14px;
+      left: 50%;
+      transform: translateX(-50%);
+      z-index: 50;
+      background: linear-gradient(135deg, #059669, #10b981);
+      color: #ecfdf5;
+      padding: 10px 22px;
+      border-radius: 999px;
+      font-size: 0.9rem;
+      font-weight: 600;
+      box-shadow: 0 8px 24px rgba(16, 185, 129, 0.25);
+      border: 1px solid #34d399;
+      pointer-events: none;
+      text-align: center;
+      max-width: 90%;
+      line-height: 1.35;
+    }
+    .connect-banner.show { display: block; }
+    .connect-banner .step {
+      font-size: 0.75rem;
+      font-weight: 500;
+      opacity: 0.9;
+      margin-top: 2px;
+    }
+    #connections {
+      position: absolute;
+      top: 0; left: 0;
+      width: 8000px;
+      height: 8000px;
+      overflow: visible;
+      pointer-events: none;
+      z-index: 1;
+    }
+    .device {
+      position: absolute;
+      width: 90px;
+      text-align: center;
+      cursor: grab;
+      user-select: none;
+      z-index: 10;
+      transition: outline 0.15s, transform 0.15s, filter 0.15s;
+    }
+    .device:active { cursor: grabbing; }
+    .device.selected {
+      outline: 2px solid #3b82f6;
+      outline-offset: 3px;
+      border-radius: 10px;
+    }
+    .device.selected.multi {
+      outline: 2px solid #2563eb;
+      box-shadow: 0 0 0 3px rgba(37, 99, 235, 0.2);
+    }
+    .device.has-error {
+      outline: 2px solid #ef4444;
+      outline-offset: 3px;
+      border-radius: 10px;
+    }
+    .device.has-error.selected {
+      outline: 2px solid #ef4444;
+      box-shadow: 0 0 0 4px rgba(59, 130, 246, 0.25);
+    }
+    .device.connect-from {
+      outline: 3px solid #10b981;
+      outline-offset: 4px;
+      border-radius: 10px;
+      transform: scale(1.08);
+      filter: drop-shadow(0 0 8px rgba(16, 185, 129, 0.45));
+      animation: connect-pulse 1.2s ease-in-out infinite;
+      z-index: 20;
+    }
+    .device.connect-target-hint {
+      outline: 2px dashed #34d399;
+      outline-offset: 3px;
+      border-radius: 10px;
+    }
+    @keyframes connect-pulse {
+      0%, 100% { filter: drop-shadow(0 0 6px rgba(16, 185, 129, 0.4)); }
+      50% { filter: drop-shadow(0 0 12px rgba(16, 185, 129, 0.7)); }
+    }
+    .device-icon {
+      width: 64px;
+      height: 64px;
+      margin: 0 auto;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      border-radius: 12px;
+      font-size: 30px;
+      box-shadow: 0 2px 8px rgba(15, 23, 42, 0.12);
+      overflow: hidden;
+    }
+    .device-icon img {
+      width: 56px;
+      height: 56px;
+      object-fit: contain;
+      display: block;
+      pointer-events: none;
+      user-select: none;
+    }
+    .host .device-icon { background: linear-gradient(145deg, #1e40af, #3b82f6); }
+    .dhcp .device-icon { background: linear-gradient(145deg, #9a3412, #f59e0b); }
+    .switch .device-icon,
+    .router .device-icon {
+      background: transparent;
+      box-shadow: none;
+      border: none;
+    }
+    .dhcp-lease-box {
+      border: 1px solid #fde68a;
+      border-radius: 6px;
+      padding: 8px;
+      margin-top: 8px;
+      background: #fffbeb;
+      font-size: 0.75rem;
+      color: #92400e;
+      line-height: 1.4;
+    }
+    .dhcp-lease-box strong { color: #78350f; }
+    .prop-actions {
+      display: flex;
+      flex-direction: column;
+      gap: 6px;
+      margin-top: 10px;
+    }
+    .prop-actions button {
+      width: 100%;
+    }
+    .ip-mode-row {
+      display: flex;
+      gap: 8px;
+      margin-top: 6px;
+    }
+    .ip-mode-row label.radio {
+      display: flex;
+      align-items: center;
+      gap: 4px;
+      font-size: 0.8rem;
+      color: #334155;
+      margin: 0;
+      cursor: pointer;
+    }
+    .ip-mode-row input[type="radio"] {
+      width: auto;
+      margin: 0;
+    }
+    .device-label {
+      font-size: 0.75rem;
+      margin-top: 5px;
+      color: #334155;
+      font-weight: 600;
+      text-shadow: none;
+    }
+    .device-ip {
+      font-size: 0.65rem;
+      color: #64748b;
+      margin-top: 1px;
+    }
+    /* PDU animado (segmento / pacote / quadro / binário) */
+    #pdu {
+      position: absolute;
+      z-index: 100;
+      display: none;
+      pointer-events: none;
+      min-width: 140px;
+      max-width: 220px;
+      transform: translate(-50%, -50%);
+      transition: box-shadow 0.25s, border-color 0.25s;
+    }
+    #pdu.show { display: block; }
+    .pdu-card {
+      background: #ffffff;
+      border: 2px solid #f59e0b;
+      border-radius: 10px;
+      box-shadow: 0 8px 24px rgba(15, 23, 42, 0.12), 0 0 14px rgba(245, 158, 11, 0.2);
+      overflow: hidden;
+      font-size: 0.68rem;
+      line-height: 1.25;
+    }
+    .pdu-type {
+      padding: 4px 8px;
+      font-weight: 700;
+      text-align: center;
+      letter-spacing: 0.02em;
+      color: #1e293b;
+      background: #fbbf24;
+    }
+    .pdu-type.msg { background: #a78bfa; color: #1e1b4b; }
+    .pdu-type.segment { background: #60a5fa; color: #0c1a2e; }
+    .pdu-type.packet { background: #34d399; color: #052e1a; }
+    .pdu-type.frame { background: #f97316; color: #1c0a00; }
+    .pdu-type.binary { background: #94a3b8; color: #0f172a; font-family: Consolas, monospace; }
+    .pdu-type.dhcp { background: #fbbf24; color: #78350f; }
+    .pdu-type.dhcp-ack { background: #34d399; color: #052e1a; }
+    .device.dhcp-renewing .device-icon {
+      box-shadow: 0 0 0 3px rgba(245, 158, 11, 0.55), 0 0 18px rgba(245, 158, 11, 0.45);
+      animation: dhcp-pulse 0.9s ease-in-out infinite;
+    }
+    @keyframes dhcp-pulse {
+      0%, 100% { filter: brightness(1); }
+      50% { filter: brightness(1.15); }
+    }
+    .dhcp-lease-bar {
+      margin-top: 6px;
+      height: 6px;
+      background: #fde68a;
+      border-radius: 4px;
+      overflow: hidden;
+    }
+    .dhcp-lease-bar > span {
+      display: block;
+      height: 100%;
+      background: linear-gradient(90deg, #f59e0b, #10b981);
+      border-radius: 4px;
+      transition: width 0.4s linear;
+    }
+    .dhcp-lease-bar.t1 > span { background: linear-gradient(90deg, #f59e0b, #ef4444); }
+    .pdu-body {
+      padding: 6px 8px;
+      color: #1e293b;
+      word-break: break-all;
+    }
+    .pdu-layer {
+      border-top: 1px dashed #e2e8f0;
+      padding: 3px 8px;
+      font-size: 0.62rem;
+      color: #64748b;
+    }
+    .pdu-layer strong { color: #334155; }
+    .pdu-binary {
+      font-family: Consolas, 'Courier New', monospace;
+      font-size: 0.58rem;
+      letter-spacing: 0.5px;
+      color: #047857;
+      max-height: 3.2em;
+      overflow: hidden;
+    }
+    /* Bolha de mensagem no host destino */
+    .host-msg-bubble {
+      position: absolute;
+      left: 50%;
+      bottom: calc(100% + 6px);
+      transform: translateX(-50%);
+      background: #ffffff;
+      border: 2px solid #10b981;
+      color: #065f46;
+      padding: 8px 12px;
+      border-radius: 12px;
+      font-size: 0.78rem;
+      font-weight: 600;
+      white-space: nowrap;
+      max-width: 180px;
+      overflow: hidden;
+      text-overflow: ellipsis;
+      z-index: 30;
+      box-shadow: 0 6px 18px rgba(16, 185, 129, 0.2);
+      pointer-events: none;
+      animation: bubble-in 0.35s ease-out;
+    }
+    .host-msg-bubble::after {
+      content: '';
+      position: absolute;
+      left: 50%;
+      top: 100%;
+      transform: translateX(-50%);
+      border: 7px solid transparent;
+      border-top-color: #10b981;
+    }
+    .host-msg-bubble .bubble-label {
+      display: block;
+      font-size: 0.62rem;
+      font-weight: 500;
+      color: #059669;
+      margin-bottom: 2px;
+    }
+    @keyframes bubble-in {
+      from { opacity: 0; transform: translateX(-50%) translateY(8px) scale(0.9); }
+      to { opacity: 1; transform: translateX(-50%) translateY(0) scale(1); }
+    }
+    /* Painel de transformações (canto do canvas) */
+    #transform-panel {
+      display: none;
+      position: absolute;
+      left: 14px;
+      bottom: 14px;
+      z-index: 60;
+      width: min(340px, 92%);
+      background: rgba(255, 255, 255, 0.96);
+      border: 1px solid #e2e8f0;
+      border-radius: 10px;
+      padding: 10px 12px;
+      box-shadow: 0 10px 28px rgba(15, 23, 42, 0.12);
+      pointer-events: none;
+    }
+    #transform-panel.show { display: block; }
+    #transform-panel .tf-header {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 8px;
+      margin-bottom: 8px;
+    }
+    #transform-panel h4 {
+      font-size: 0.78rem;
+      color: #1d4ed8;
+      margin: 0;
+      flex: 1;
+      min-width: 0;
+    }
+    .playback-controls {
+      display: flex;
+      gap: 4px;
+      pointer-events: auto;
+      flex-shrink: 0;
+    }
+    .playback-controls button {
+      padding: 5px 10px;
+      font-size: 0.75rem;
+      min-width: 36px;
+    }
+    .playback-controls button:disabled {
+      opacity: 0.45;
+      cursor: not-allowed;
+    }
+    .playback-status {
+      font-size: 0.65rem;
+      color: #64748b;
+      margin-bottom: 6px;
+      min-height: 1em;
+    }
+    .playback-status.paused {
+      color: #d97706;
+      font-weight: 600;
+    }
+    #pdu.paused-glow .pdu-card {
+      box-shadow: 0 8px 24px rgba(15, 23, 42, 0.12), 0 0 16px rgba(245, 158, 11, 0.35);
+      border-color: #f59e0b;
+      animation: pdu-paused-pulse 1.2s ease-in-out infinite;
+    }
+    @keyframes pdu-paused-pulse {
+      0%, 100% { opacity: 1; }
+      50% { opacity: 0.8; }
+    }
+    .tf-step {
+      display: flex;
+      gap: 8px;
+      align-items: flex-start;
+      margin-bottom: 6px;
+      font-size: 0.7rem;
+      color: #94a3b8;
+    }
+    .tf-step.active { color: #1e293b; }
+    .tf-step.done { color: #059669; }
+    .tf-step .tf-badge {
+      flex-shrink: 0;
+      min-width: 62px;
+      text-align: center;
+      padding: 2px 5px;
+      border-radius: 4px;
+      font-weight: 700;
+      font-size: 0.62rem;
+      background: #e2e8f0;
+      color: #475569;
+    }
+    .tf-step.active .tf-badge.msg { background: #7c3aed; color: #fff; }
+    .tf-step.active .tf-badge.segment { background: #2563eb; color: #fff; }
+    .tf-step.active .tf-badge.packet { background: #059669; color: #fff; }
+    .tf-step.active .tf-badge.frame { background: #ea580c; color: #fff; }
+    .tf-step.active .tf-badge.binary { background: #64748b; color: #fff; }
+    .tf-step.active .tf-badge.dhcp { background: #d97706; color: #fff; }
+    .tf-step.active .tf-badge.dhcp-ack { background: #059669; color: #fff; }
+    .tf-step.done .tf-badge { background: #d1fae5; color: #047857; }
+    .modal-overlay {
+      display: none;
+      position: fixed;
+      inset: 0;
+      background: rgba(15, 23, 42, 0.4);
+      z-index: 200;
+      align-items: center;
+      justify-content: center;
+    }
+    .modal-overlay.show { display: flex; }
+    .modal {
+      background: #ffffff;
+      border-radius: 12px;
+      padding: 22px;
+      width: 400px;
+      max-width: 95vw;
+      border: 1px solid #e2e8f0;
+      box-shadow: 0 20px 40px rgba(15, 23, 42, 0.15);
+    }
+    .modal h2 {
+      font-size: 1.1rem;
+      color: #1d4ed8;
+      margin-bottom: 16px;
+    }
+    .modal label {
+      display: block;
+      font-size: 0.8rem;
+      color: #64748b;
+      margin-top: 10px;
+    }
+    .modal select, .modal input {
+      width: 100%;
+      padding: 8px;
+      margin-top: 4px;
+      background: #ffffff;
+      border: 1px solid #cbd5e1;
+      border-radius: 6px;
+      color: #1e293b;
+    }
+    .modal-actions {
+      display: flex;
+      gap: 10px;
+      margin-top: 18px;
+      justify-content: flex-end;
+    }
+    .hint {
+      font-size: 0.72rem;
+      color: #64748b;
+      margin-top: 12px;
+      line-height: 1.4;
+    }
+  </style>
+</head>
+<body>
+  <div class="toolbar">
+    <h1>🖧 Simulador de Topologia de Rede</h1>
+    <button id="btn-host">+ Host</button>
+    <button id="btn-switch">+ Switch</button>
+    <button id="btn-router">+ Roteador</button>
+    <button id="btn-dhcp" title="Servidor DHCP — distribuição automática de IPs">+ DHCP</button>
+    <div class="toolbar-sep"></div>
+    <button id="btn-connect" class="secondary" title="Ativa o modo de ligação entre dispositivos">🔌 Modo Conectar</button>
+    <button id="btn-select-all" class="secondary" title="Seleciona todos os dispositivos (Ctrl+A)">▣ Selecionar tudo</button>
+    <button id="btn-delete" class="danger">Excluir</button>
+    <button id="btn-clear" class="danger">Limpar Tudo</button>
+    <div class="toolbar-sep"></div>
+    <button id="btn-save" class="save-btn" title="Salva a topologia neste navegador">💾 Salvar</button>
+    <button id="btn-export" class="secondary" title="Baixa um arquivo JSON da topologia">⬇ Exportar</button>
+    <button id="btn-import" class="secondary" title="Carrega topologia de um arquivo JSON">⬆ Importar</button>
+    <input type="file" id="import-file" accept=".json,application/json" style="display:none">
+    <span id="save-status" class="save-status">Nada salvo ainda</span>
+    <div class="toolbar-sep"></div>
+    <button id="btn-validate" class="warn-btn" title="Executa todas as validações da topologia">✔ Validar</button>
+    <button id="btn-simulate">📤 Simular Mensagem</button>
+  </div>
+
+  <div class="main">
+    <div class="sidebar" id="sidebar">
+      <div class="properties" id="properties">
+        <p style="color:#64748b;font-size:0.85rem;">Selecione um dispositivo para configurar endereçamento IP, máscara e gateway.</p>
+        <p class="hint">Dica: hosts (estático ou DHCP), servidor DHCP (escopo/range/lease), roteadores (interfaces) e switches (L2).</p>
+      </div>
+
+      <div class="sidebar-splitter" id="split-props-log" title="Arraste para redimensionar" role="separator" aria-orientation="horizontal"></div>
+
+      <div class="log-section" id="log-section">
+        <h3>
+          Histórico de ações
+          <button id="btn-clear-log" class="secondary" type="button">Limpar log</button>
+        </h3>
+        <div id="log"></div>
+      </div>
+
+      <div class="sidebar-splitter" id="split-log-val" title="Arraste para redimensionar" role="separator" aria-orientation="horizontal"></div>
+
+      <div class="validation-section" id="validation-section">
+        <h3>
+          <span>Validações <span id="val-badge" class="val-badge ok">OK</span></span>
+          <button id="btn-validate-side" class="secondary" type="button">Revalidar</button>
+        </h3>
+        <div id="validation-list">
+          <div class="val-item ok">Nenhum problema detectado.</div>
+        </div>
+      </div>
+    </div>
+
+    <div class="canvas-container" id="canvas">
+      <div class="canvas-world" id="world">
+        <svg id="connections"></svg>
+        <div id="pdu" aria-hidden="true">
+          <div class="pdu-card">
+            <div class="pdu-type msg" id="pdu-type">Mensagem</div>
+            <div class="pdu-body" id="pdu-body">…</div>
+            <div class="pdu-layer" id="pdu-meta"></div>
+          </div>
+        </div>
+      </div>
+      <div class="connect-banner" id="connect-banner">
+        🔌 MODO LIGAÇÃO ATIVO
+        <div class="step" id="connect-step">Clique no primeiro dispositivo</div>
+      </div>
+      <div class="canvas-controls" id="canvas-controls">
+        <div class="zoom-row">
+          <button type="button" id="btn-zoom-out" title="Diminuir zoom (−)">−</button>
+          <span class="zoom-label" id="zoom-label">100%</span>
+          <button type="button" id="btn-zoom-in" title="Aumentar zoom (+)">+</button>
+          <button type="button" id="btn-zoom-reset" title="Resetar zoom e posição">100%</button>
+        </div>
+        <div class="zoom-row">
+          <button type="button" id="btn-canvas-select-all" title="Selecionar todos (Ctrl+A)">Selecionar tudo</button>
+        </div>
+        <div class="ctrl-hint">Scroll: zoom · Arraste o fundo: mover quadro · Ctrl+A: tudo</div>
+      </div>
+      <div id="transform-panel">
+        <div class="tf-header">
+          <h4 id="tf-title">Encapsulamento (origem)</h4>
+          <div class="playback-controls">
+            <button type="button" id="btn-sim-pause" class="secondary" title="Pausar (Espaço)">⏸</button>
+            <button type="button" id="btn-sim-play" class="secondary" title="Continuar (Espaço)" style="display:none">▶</button>
+            <button type="button" id="btn-sim-stop" class="danger" title="Parar simulação">⏹</button>
+          </div>
+        </div>
+        <div class="playback-status" id="playback-status"></div>
+        <div id="tf-steps"></div>
+      </div>
+    </div>
+  </div>
+
+  <div class="modal-overlay" id="modal">
+    <div class="modal">
+      <h2>Enviar Mensagem entre Hosts</h2>
+      <label>Host Emissor (origem)</label>
+      <select id="sim-src"></select>
+      <label>Host Receptor (destino)</label>
+      <select id="sim-dst"></select>
+      <label>Mensagem</label>
+      <input type="text" id="sim-msg" value="Olá, rede!" placeholder="Digite a mensagem">
+      <div class="modal-actions">
+        <button class="secondary" id="btn-cancel-sim">Cancelar</button>
+        <button id="btn-send-sim">Enviar Pacote</button>
+      </div>
+      <p class="hint">O envio segue o fluxo real: mesma rede → ARP/entrega direta; outra rede → gateway → rota → entrega. Qualquer falha interrompe com a causa exata.</p>
+    </div>
+  </div>
+
+<script>
+(() => {
+  const STORAGE_KEY = 'sft_redes_topology_v1';
+  const LOG_KEY = 'sft_redes_log_v1';
+
+  /** Tipos que podem ser conectados entre si */
+  const CABLE_RULES = {
+    host:   new Set(['switch', 'router']),
+    switch: new Set(['host', 'switch', 'router', 'dhcp']),
+    router: new Set(['host', 'switch', 'router', 'dhcp']),
+    dhcp:   new Set(['switch', 'router'])
+  };
+
+  const DEFAULT_LEASE_SEC = 3600;
+  const MIN_LEASE_SEC = 20; // permite lease curto na aula (T1 = metade → animação de renovação)
+
+  const state = {
+    devices: [],
+    links: [],
+    selectedId: null,
+    selectedIds: [],
+    mode: 'select',
+    connectFrom: null,
+    nextId: 1,
+    dragging: null,
+    offset: { x: 0, y: 0 },
+    dirty: false,
+    lastSavedAt: null,
+    history: [],
+    lastIssues: [],
+    view: { zoom: 1, panX: 0, panY: 0 },
+    spaceDown: false
+  };
+
+  const VIEW_ZOOM_MIN = 0.25;
+  const VIEW_ZOOM_MAX = 3;
+  const VIEW_ZOOM_STEP = 0.1;
+
+  // ========== UTILITÁRIOS DE IP ==========
+  function ipToNumber(ip) {
+    if (!ip || !/^\d{1,3}(\.\d{1,3}){3}$/.test(ip)) return null;
+    const parts = ip.split('.').map(Number);
+    if (parts.some(p => p > 255)) return null;
+    return ((parts[0] << 24) | (parts[1] << 16) | (parts[2] << 8) | parts[3]) >>> 0;
+  }
+
+  function numberToIp(n) {
+    return [
+      (n >>> 24) & 255,
+      (n >>> 16) & 255,
+      (n >>> 8) & 255,
+      n & 255
+    ].join('.');
+  }
+
+  function isValidMask(mask) {
+    const n = ipToNumber(mask);
+    if (n === null) return false;
+    // máscara contígua: 1s seguidos de 0s
+    const inv = (~n) >>> 0;
+    return (inv & (inv + 1)) === 0;
+  }
+
+  function maskToPrefix(mask) {
+    const n = ipToNumber(mask);
+    if (n === null) return null;
+    let bits = 0;
+    let x = n;
+    for (let i = 0; i < 32; i++) {
+      if (x & 0x80000000) bits++;
+      else break;
+      x = (x << 1) >>> 0;
+    }
+    // verifica contígua
+    if (!isValidMask(mask)) return null;
+    return bits;
+  }
+
+  function getNetworkAddr(ip, mask) {
+    const ipN = ipToNumber(ip);
+    const maskN = ipToNumber(mask);
+    if (ipN === null || maskN === null) return null;
+    return (ipN & maskN) >>> 0;
+  }
+
+  function getBroadcastAddr(ip, mask) {
+    const ipN = ipToNumber(ip);
+    const maskN = ipToNumber(mask);
+    if (ipN === null || maskN === null) return null;
+    return (ipN | (~maskN >>> 0)) >>> 0;
+  }
+
+  function netKey(ip, mask) {
+    const n = getNetworkAddr(ip, mask);
+    const p = maskToPrefix(mask);
+    if (n === null || p === null) return null;
+    return `${numberToIp(n)}/${p}`;
+  }
+
+  function isSameNetwork(a, b) {
+    if (!a?.ip || !b?.ip) return false;
+    const ma = a.mask || '255.255.255.0';
+    const mb = b.mask || '255.255.255.0';
+    const na = getNetworkAddr(a.ip, ma);
+    const nb = getNetworkAddr(b.ip, mb);
+    return na !== null && na === nb && ipToNumber(ma) === ipToNumber(mb);
+  }
+
+  function hostOnNetwork(hostIp, hostMask, netIp, netMask) {
+    // host está na rede definida por netIp/netMask?
+    const hNet = getNetworkAddr(hostIp, netMask);
+    const nNet = getNetworkAddr(netIp, netMask);
+    return hNet !== null && hNet === nNet;
+  }
+
+  /** Valida um IP individual (sintaxe + rede/broadcast) */
+  function validateIpAssignment(ip, mask, label) {
+    const issues = [];
+    if (!ip) return issues;
+    const ipN = ipToNumber(ip);
+    if (ipN === null) {
+      issues.push({ level: 'err', msg: `${label}: endereço IP inválido (${ip}).`, devices: [] });
+      return issues;
+    }
+    if (!mask || !isValidMask(mask)) {
+      issues.push({ level: 'err', msg: `${label}: máscara inválida (${mask || 'vazia'}).`, devices: [] });
+      return issues;
+    }
+    const net = getNetworkAddr(ip, mask);
+    const bcast = getBroadcastAddr(ip, mask);
+    const prefix = maskToPrefix(mask);
+    if (net !== null && ipN === net && prefix !== null && prefix < 31) {
+      issues.push({
+        level: 'err',
+        msg: `${numberToIp(net)} é o endereço da rede e não pode ser atribuído a um dispositivo.`,
+        devices: []
+      });
+    }
+    if (bcast !== null && ipN === bcast && prefix !== null && prefix < 31) {
+      issues.push({
+        level: 'err',
+        msg: `${numberToIp(bcast)} é o endereço de broadcast.`,
+        devices: []
+      });
+    }
+    return issues;
+  }
+
+  function formatLease(seconds) {
+    const s = Math.max(0, Number(seconds) || 0);
+    if (s < 60) return `${s}s`;
+    if (s < 3600) return `${Math.round(s / 60)} min`;
+    if (s < 86400) {
+      const h = Math.floor(s / 3600);
+      const m = Math.round((s % 3600) / 60);
+      return m ? `${h}h ${m}min` : `${h}h`;
+    }
+    const d = Math.floor(s / 86400);
+    const h = Math.round((s % 86400) / 3600);
+    return h ? `${d}d ${h}h` : `${d}d`;
+  }
+
+  function parseLeaseInput(value) {
+    // aceita segundos numéricos ou "1h", "30m", "1d"
+    const raw = String(value || '').trim().toLowerCase();
+    if (!raw) return DEFAULT_LEASE_SEC;
+    if (/^\d+$/.test(raw)) return Math.max(MIN_LEASE_SEC, parseInt(raw, 10));
+    const m = raw.match(/^(\d+(?:\.\d+)?)\s*([smhd])$/);
+    if (!m) return null;
+    const n = parseFloat(m[1]);
+    const unit = m[2];
+    const mult = unit === 's' ? 1 : unit === 'm' ? 60 : unit === 'h' ? 3600 : 86400;
+    return Math.max(MIN_LEASE_SEC, Math.round(n * mult));
+  }
+
+  function leaseGrantedAt(lease) {
+    if (!lease) return null;
+    if (lease.grantedAt) return lease.grantedAt;
+    if (lease.expiresAt && lease.leaseSeconds) {
+      return lease.expiresAt - lease.leaseSeconds * 1000;
+    }
+    return null;
+  }
+
+  function leaseT1At(lease) {
+    const g = leaseGrantedAt(lease);
+    if (g == null || !lease.leaseSeconds) return null;
+    return g + (lease.leaseSeconds * 1000) / 2;
+  }
+
+  function defaultDhcpConfig() {
+    return {
+      enabled: true,
+      poolStart: '192.168.1.100',
+      poolEnd: '192.168.1.200',
+      mask: '255.255.255.0',
+      gateway: '192.168.1.1',
+      dns: '8.8.8.8',
+      lease: DEFAULT_LEASE_SEC,
+      leases: {}
+    };
+  }
+
+  function ensureDhcpConfig(dev) {
+    if (!dev || dev.type !== 'dhcp') return null;
+    if (!dev.dhcp) dev.dhcp = defaultDhcpConfig();
+    if (!dev.dhcp.leases || typeof dev.dhcp.leases !== 'object') dev.dhcp.leases = {};
+    if (dev.dhcp.enabled === undefined) dev.dhcp.enabled = true;
+    if (!dev.dhcp.mask) dev.dhcp.mask = dev.mask || '255.255.255.0';
+    if (!dev.dhcp.lease || dev.dhcp.lease < MIN_LEASE_SEC) dev.dhcp.lease = DEFAULT_LEASE_SEC;
+    return dev.dhcp;
+  }
+
+  function isIpInRange(ip, start, end) {
+    const n = ipToNumber(ip);
+    const a = ipToNumber(start);
+    const b = ipToNumber(end);
+    if (n === null || a === null || b === null) return false;
+    const lo = Math.min(a, b);
+    const hi = Math.max(a, b);
+    return n >= lo && n <= hi;
+  }
+
+  function usedIpsOnTopology(excludeDeviceId) {
+    const used = new Set();
+    collectIpEndpoints().forEach(ep => {
+      if (excludeDeviceId && ep.deviceId === excludeDeviceId) return;
+      if (ep.ip) used.add(ep.ip);
+    });
+    return used;
+  }
+
+  function reservedByDhcp(server, excludeHostId) {
+    const cfg = ensureDhcpConfig(server);
+    const reserved = new Set();
+    if (server.ip) reserved.add(server.ip);
+    if (cfg.gateway) reserved.add(cfg.gateway);
+    if (cfg.dns && ipToNumber(cfg.dns) !== null) reserved.add(cfg.dns);
+    Object.entries(cfg.leases || {}).forEach(([ip, lease]) => {
+      if (excludeHostId && lease.hostId === excludeHostId) return;
+      // lease expirada não reserva
+      if (lease.expiresAt && lease.expiresAt < Date.now()) return;
+      reserved.add(ip);
+    });
+    return reserved;
+  }
+
+  function validateDhcpScope(server) {
+    const issues = [];
+    const cfg = ensureDhcpConfig(server);
+    const label = server.label || 'DHCP';
+    const mask = cfg.mask || server.mask || '255.255.255.0';
+
+    if (!server.ip) {
+      issues.push({ level: 'err', msg: `${label}: o servidor DHCP precisa de um IP estático.`, devices: [server.id] });
+    } else {
+      validateIpAssignment(server.ip, server.mask || mask, label).forEach(i => {
+        issues.push({ ...i, devices: [server.id] });
+      });
+    }
+
+    if (!cfg.enabled) {
+      issues.push({ level: 'warn', msg: `${label}: serviço DHCP desativado.`, devices: [server.id] });
+    }
+
+    const startN = ipToNumber(cfg.poolStart);
+    const endN = ipToNumber(cfg.poolEnd);
+    if (startN === null) {
+      issues.push({ level: 'err', msg: `${label}: início do range inválido (${cfg.poolStart || 'vazio'}).`, devices: [server.id] });
+    }
+    if (endN === null) {
+      issues.push({ level: 'err', msg: `${label}: fim do range inválido (${cfg.poolEnd || 'vazio'}).`, devices: [server.id] });
+    }
+    if (!isValidMask(mask)) {
+      issues.push({ level: 'err', msg: `${label}: máscara do escopo inválida (${mask}).`, devices: [server.id] });
+    }
+    if (startN !== null && endN !== null && startN > endN) {
+      issues.push({ level: 'err', msg: `${label}: o início do range deve ser ≤ ao fim.`, devices: [server.id] });
+    }
+
+    if (startN !== null && endN !== null && isValidMask(mask)) {
+      const netStart = getNetworkAddr(cfg.poolStart, mask);
+      const netEnd = getNetworkAddr(cfg.poolEnd, mask);
+      if (netStart !== netEnd) {
+        issues.push({
+          level: 'err',
+          msg: `${label}: range deve estar na mesma sub-rede (máscara ${mask}).`,
+          devices: [server.id]
+        });
+      } else {
+        const bcast = getBroadcastAddr(cfg.poolStart, mask);
+        const net = netStart;
+        if (net !== null && (startN === net || endN === net)) {
+          issues.push({ level: 'err', msg: `${label}: o range não pode incluir o endereço de rede.`, devices: [server.id] });
+        }
+        if (bcast !== null && (startN === bcast || endN === bcast)) {
+          issues.push({ level: 'err', msg: `${label}: o range não pode incluir o endereço de broadcast.`, devices: [server.id] });
+        }
+        if (server.ip) {
+          const srvNet = getNetworkAddr(server.ip, mask);
+          if (srvNet !== netStart) {
+            issues.push({
+              level: 'err',
+              msg: `${label}: IP do servidor (${server.ip}) deve estar na mesma rede do escopo (${numberToIp(netStart)}).`,
+              devices: [server.id]
+            });
+          }
+          if (isIpInRange(server.ip, cfg.poolStart, cfg.poolEnd)) {
+            issues.push({
+              level: 'warn',
+              msg: `${label}: o IP do servidor está dentro do pool — será excluído da alocação.`,
+              devices: [server.id]
+            });
+          }
+        }
+      }
+    }
+
+    if (cfg.gateway) {
+      if (ipToNumber(cfg.gateway) === null) {
+        issues.push({ level: 'err', msg: `${label}: gateway do escopo inválido (${cfg.gateway}).`, devices: [server.id] });
+      } else if (isValidMask(mask) && startN !== null) {
+        const gNet = getNetworkAddr(cfg.gateway, mask);
+        const pNet = getNetworkAddr(cfg.poolStart, mask);
+        if (gNet !== pNet) {
+          issues.push({
+            level: 'err',
+            msg: `${label}: gateway ${cfg.gateway} fora da rede do escopo.`,
+            devices: [server.id]
+          });
+        } else if (!findRouterByIp(cfg.gateway)) {
+          issues.push({
+            level: 'warn',
+            msg: `${label}: gateway ${cfg.gateway} não corresponde a nenhuma interface de roteador (configure o roteador).`,
+            devices: [server.id]
+          });
+        }
+        if (isIpInRange(cfg.gateway, cfg.poolStart, cfg.poolEnd)) {
+          issues.push({
+            level: 'warn',
+            msg: `${label}: o gateway está dentro do pool — será excluído da alocação.`,
+            devices: [server.id]
+          });
+        }
+      }
+    } else {
+      issues.push({ level: 'warn', msg: `${label}: gateway do escopo não configurado (hosts em outra rede não terão rota).`, devices: [server.id] });
+    }
+
+    if (cfg.dns && ipToNumber(cfg.dns) === null) {
+      issues.push({ level: 'err', msg: `${label}: DNS do escopo inválido (${cfg.dns}).`, devices: [server.id] });
+    }
+
+    if (!cfg.lease || cfg.lease < MIN_LEASE_SEC) {
+      issues.push({
+        level: 'err',
+        msg: `${label}: tempo de concessão (lease) deve ser ≥ ${MIN_LEASE_SEC} segundos.`,
+        devices: [server.id]
+      });
+    }
+
+    return issues;
+  }
+
+  function findDhcpServersInDomain(hostId) {
+    const domain = getBroadcastDomainFrom(hostId);
+    return state.devices.filter(d => d.type === 'dhcp' && domain.has(d.id));
+  }
+
+  function allocateDhcpAddress(server, host) {
+    const cfg = ensureDhcpConfig(server);
+    const mask = cfg.mask || server.mask || '255.255.255.0';
+    const startN = ipToNumber(cfg.poolStart);
+    const endN = ipToNumber(cfg.poolEnd);
+    if (startN === null || endN === null) return { ok: false, msg: 'Range do pool inválido.' };
+    const lo = Math.min(startN, endN);
+    const hi = Math.max(startN, endN);
+    const used = usedIpsOnTopology(host.id);
+    const reserved = reservedByDhcp(server, host.id);
+    reserved.forEach(ip => used.add(ip));
+
+    // renova o mesmo IP se o host já tinha lease neste servidor e ainda está no pool
+    const existing = Object.entries(cfg.leases).find(([, l]) => l.hostId === host.id);
+    if (existing) {
+      const [prevIp] = existing;
+      if (isIpInRange(prevIp, cfg.poolStart, cfg.poolEnd) && (!used.has(prevIp) || host.ip === prevIp)) {
+        return { ok: true, ip: prevIp, renewed: true };
+      }
+    }
+
+    for (let n = lo; n <= hi; n++) {
+      const ip = numberToIp(n);
+      const net = getNetworkAddr(ip, mask);
+      const bcast = getBroadcastAddr(ip, mask);
+      if (n === net || n === bcast) continue;
+      if (used.has(ip)) continue;
+      return { ok: true, ip, renewed: false };
+    }
+    return { ok: false, msg: 'Pool DHCP esgotado — nenhum endereço livre no range.' };
+  }
+
+  function purgeExpiredLeases(server) {
+    const cfg = ensureDhcpConfig(server);
+    const now = Date.now();
+    Object.entries(cfg.leases).forEach(([ip, lease]) => {
+      if (lease.expiresAt && lease.expiresAt < now) {
+        delete cfg.leases[ip];
+        const h = getDevice(lease.hostId);
+        if (h && h.type === 'host' && h.ip === ip && h.ipMode === 'dhcp') {
+          h.ip = '';
+          h.mask = '255.255.255.0';
+          h.gateway = '';
+          h.dns = '';
+          h.dhcpLease = null;
+          updateDeviceIpLabel(h);
+        }
+      }
+    });
+  }
+
+  /**
+   * Simula DORA (Discover → Offer → Request → Ack) e aplica IP no host.
+   */
+  function requestDhcpForHost(host, { silent = false } = {}) {
+    if (!host || host.type !== 'host') return { ok: false, msg: 'Dispositivo inválido.' };
+    if (!isConnected(host.id)) {
+      return { ok: false, msg: `${host.label} não está conectado à rede.` };
+    }
+
+    const servers = findDhcpServersInDomain(host.id);
+    if (!servers.length) {
+      const allDhcp = state.devices.filter(d => d.type === 'dhcp');
+      if (!allDhcp.length) {
+        return {
+          ok: false,
+          msg: `Nenhum servidor DHCP na topologia. Use "+ DHCP", ligue-o no MESMO switch que ${host.label} e configure o IP estático + escopo.`
+        };
+      }
+      const names = allDhcp.map(d => d.label).join(', ');
+      const hostNeighbors = neighborsOf(host.id).map(n => `${n.label}(${n.type})`).join(', ') || 'nenhum';
+      return {
+        ok: false,
+        msg: `Nenhum servidor DHCP no mesmo segmento L2 de ${host.label}. ` +
+          `Existe(m) ${names}, mas o broadcast DHCP NÃO atravessa o roteador. ` +
+          `Ligue o DHCP e o host no MESMO switch (vizinhos de ${host.label}: ${hostNeighbors}). ` +
+          `Evite Host→Roteador e DHCP→outra porta/rede.`
+      };
+    }
+
+    // limpa leases expiradas nos servidores do domínio
+    servers.forEach(purgeExpiredLeases);
+
+    const active = servers.filter(s => {
+      const cfg = ensureDhcpConfig(s);
+      return cfg.enabled && s.ip;
+    });
+    if (!active.length) {
+      return { ok: false, msg: 'Há servidor DHCP no segmento, mas o serviço está desativado ou sem IP.' };
+    }
+
+    // se vários, usa o primeiro com escopo válido
+    let server = null;
+    let scopeIssues = [];
+    for (const s of active) {
+      const iss = validateDhcpScope(s).filter(i => i.level === 'err');
+      if (!iss.length) { server = s; break; }
+      scopeIssues = iss;
+    }
+    if (!server) {
+      return {
+        ok: false,
+        msg: scopeIssues[0]?.msg || 'Servidor DHCP com configuração de escopo inválida.'
+      };
+    }
+
+    const cfg = ensureDhcpConfig(server);
+    const alloc = allocateDhcpAddress(server, host);
+    if (!alloc.ok) return alloc;
+
+    const leaseSec = cfg.lease || DEFAULT_LEASE_SEC;
+    const now = Date.now();
+    const expiresAt = now + leaseSec * 1000;
+
+    // remove leases antigas deste host neste servidor
+    Object.keys(cfg.leases).forEach(ip => {
+      if (cfg.leases[ip].hostId === host.id) delete cfg.leases[ip];
+    });
+
+    cfg.leases[alloc.ip] = {
+      hostId: host.id,
+      hostLabel: host.label,
+      grantedAt: now,
+      expiresAt,
+      leaseSeconds: leaseSec
+    };
+
+    host.ipMode = 'dhcp';
+    host.ip = alloc.ip;
+    host.mask = cfg.mask || server.mask || '255.255.255.0';
+    host.gateway = cfg.gateway || '';
+    host.dns = cfg.dns || '';
+    host.dhcpLease = {
+      serverId: server.id,
+      serverLabel: server.label,
+      serverIp: server.ip,
+      ip: alloc.ip,
+      grantedAt: now,
+      expiresAt,
+      leaseSeconds: leaseSec,
+      t1Fired: false,
+      renewInProgress: false,
+      dns: cfg.dns || '',
+      gateway: cfg.gateway || ''
+    };
+
+    updateDeviceIpLabel(host);
+    markDirty();
+    ensureDhcpLeaseMonitor();
+
+    if (!silent) {
+      const t1Sec = Math.round(leaseSec / 2);
+      log('——— DHCP (DORA) ———', 'action');
+      log(`① DISCOVER: ${host.label} envia broadcast DHCP Discover no segmento.`, 'info');
+      log(`② OFFER: ${server.label} (${server.ip}) oferece ${alloc.ip}.`, 'ok');
+      log(`③ REQUEST: ${host.label} solicita ${alloc.ip}.`, 'info');
+      log(
+        `④ ACK: ${server.label} confirma — IP ${alloc.ip}, máscara ${host.mask}, GW ${host.gateway || '—'}, DNS ${host.dns || '—'}, lease ${formatLease(leaseSec)}${alloc.renewed ? ' (renovação)' : ''}.`,
+        'ok'
+      );
+      log(`✅ ${host.label} configurado via DHCP: ${alloc.ip}/${maskToPrefix(host.mask) ?? '?'}`, 'ok');
+      log(`⏱ T1 (renovação) em ${formatLease(t1Sec)} — metade do lease. O host pedirá renovação automaticamente.`, 'info');
+    }
+
+    return {
+      ok: true,
+      server,
+      ip: alloc.ip,
+      mask: host.mask,
+      gateway: host.gateway,
+      dns: host.dns,
+      lease: leaseSec,
+      renewed: alloc.renewed
+    };
+  }
+
+  /**
+   * Estende a lease após renovação bem-sucedida (T1).
+   */
+  function extendDhcpLease(host, server) {
+    const cfg = ensureDhcpConfig(server);
+    const leaseSec = cfg.lease || host.dhcpLease?.leaseSeconds || DEFAULT_LEASE_SEC;
+    const now = Date.now();
+    const expiresAt = now + leaseSec * 1000;
+    const ip = host.ip;
+
+    if (ip && cfg.leases[ip]) {
+      cfg.leases[ip].grantedAt = now;
+      cfg.leases[ip].expiresAt = expiresAt;
+      cfg.leases[ip].leaseSeconds = leaseSec;
+      cfg.leases[ip].hostLabel = host.label;
+    } else if (ip) {
+      cfg.leases[ip] = {
+        hostId: host.id,
+        hostLabel: host.label,
+        grantedAt: now,
+        expiresAt,
+        leaseSeconds: leaseSec
+      };
+    }
+
+    host.dhcpLease = {
+      ...(host.dhcpLease || {}),
+      serverId: server.id,
+      serverLabel: server.label,
+      serverIp: server.ip,
+      ip,
+      grantedAt: now,
+      expiresAt,
+      leaseSeconds: leaseSec,
+      t1Fired: false,
+      renewInProgress: false,
+      dns: cfg.dns || host.dns || '',
+      gateway: cfg.gateway || host.gateway || ''
+    };
+    host.mask = cfg.mask || host.mask || '255.255.255.0';
+    host.gateway = cfg.gateway || host.gateway || '';
+    host.dns = cfg.dns || host.dns || '';
+    updateDeviceIpLabel(host);
+    markDirty();
+    return { leaseSec, expiresAt };
+  }
+
+  /**
+   * Renovação unicast (T1): REQUEST → ACK, sem Discover/Offer.
+   */
+  async function performDhcpRenewal(host, { animate = true } = {}) {
+    if (!host || host.type !== 'host' || !host.dhcpLease) {
+      return { ok: false, msg: 'Host sem lease DHCP.' };
+    }
+    if (host.dhcpLease.renewInProgress) {
+      return { ok: false, msg: 'Renovação já em andamento.' };
+    }
+
+    host.dhcpLease.renewInProgress = true;
+    const lease = host.dhcpLease;
+    const server = getDevice(lease.serverId);
+    const el = document.getElementById(host.id);
+    if (el) el.classList.add('dhcp-renewing');
+
+    try {
+      if (!server || server.type !== 'dhcp') {
+        log(`❌ Renovação DHCP falhou: servidor de ${host.label} não encontrado.`, 'err');
+        return { ok: false, msg: 'Servidor DHCP não encontrado.' };
+      }
+
+      const cfg = ensureDhcpConfig(server);
+      if (!cfg.enabled) {
+        log(`❌ Renovação DHCP: ${server.label} está com o serviço desativado.`, 'err');
+        return { ok: false, msg: 'Serviço DHCP desativado.' };
+      }
+      if (!isConnected(host.id) || !isConnected(server.id)) {
+        log(`❌ Renovação DHCP: ${host.label} ou ${server.label} desconectado.`, 'err');
+        return { ok: false, msg: 'Dispositivo desconectado.' };
+      }
+
+      const path = findPath(host.id, server.id);
+      if (!path) {
+        log(`❌ Renovação DHCP: sem caminho físico entre ${host.label} e ${server.label}.`, 'err');
+        return { ok: false, msg: 'Sem caminho até o servidor.' };
+      }
+
+      // servidor ainda no mesmo L2?
+      const domain = getBroadcastDomainFrom(host.id);
+      if (!domain.has(server.id)) {
+        log(`❌ Renovação DHCP: ${server.label} não está mais no segmento L2 de ${host.label}.`, 'err');
+        return { ok: false, msg: 'Servidor fora do segmento.' };
+      }
+
+      log('——— DHCP renovação (T1 — metade do lease) ———', 'action');
+      log(`⏱ ${host.label}: chegou a metade da concessão (${formatLease(lease.leaseSeconds)}). Iniciando renovação unicast.`, 'warn');
+      log(`① REQUEST: ${host.label} (${host.ip}) → ${server.label} (${server.ip}) pede para manter o IP.`, 'info');
+
+      if (animate) {
+        const anim = await animateDhcpRenewal(path, host, server);
+        if (anim && anim.aborted) {
+          // permite tentar de novo no próximo tick (T1 ainda "devido")
+          if (host.dhcpLease) host.dhcpLease.t1Fired = false;
+          return { ok: false, msg: 'Animação interrompida.' };
+        }
+      }
+
+      const ext = extendDhcpLease(host, server);
+      log(
+        `② ACK: ${server.label} renova o lease de ${host.label} — IP ${host.ip}, novo prazo ${formatLease(ext.leaseSec)} (T1 de novo na metade).`,
+        'ok'
+      );
+      log(`✅ Lease renovado. Próxima renovação automática em ${formatLease(Math.round(ext.leaseSec / 2))}.`, 'ok');
+
+      // atualiza painel se o host/servidor estiver selecionado
+      if (state.selectedId === host.id || state.selectedId === server.id) {
+        renderProperties();
+      }
+      runValidation(false);
+      return { ok: true, leaseSec: ext.leaseSec };
+    } finally {
+      if (host.dhcpLease) host.dhcpLease.renewInProgress = false;
+      el?.classList.remove('dhcp-renewing');
+      document.getElementById(server?.id)?.classList.remove('dhcp-renewing');
+    }
+  }
+
+  async function animateDhcpRenewal(path, host, server) {
+    // se já há animação de mensagem, renovação lógica segue sem PDU
+    if (playback.running) {
+      log('   (outra simulação no quadro — renovação sem animação visual)', 'info');
+      return { aborted: false, skippedVisual: true };
+    }
+
+    playback.start();
+    const panel = document.getElementById('transform-panel');
+    if (panel) panel.classList.add('show');
+    let aborted = false;
+
+    try {
+      const steps = [
+        { kind: 'dhcp', badge: 'T1', text: 'Metade do lease — renovar' },
+        { kind: 'dhcp', badge: 'REQUEST', text: `${host.label} → ${server.label}` },
+        { kind: 'dhcp-ack', badge: 'ACK', text: `${server.label} → ${host.label}` },
+        { kind: 'dhcp-ack', badge: 'OK', text: 'Lease estendido' }
+      ];
+
+      document.getElementById(host.id)?.classList.add('dhcp-renewing');
+      document.getElementById(server.id)?.classList.add('dhcp-renewing');
+
+      showTransformPanel('DHCP · Renovação (T1)', steps, 0);
+      setPduView(
+        'dhcp',
+        `Renew ${host.ip}`,
+        `<strong>DHCP</strong> · T1 · unicast · lease ${formatLease(host.dhcpLease?.leaseSeconds)}`
+      );
+      placePduAt(host);
+      log(`📦 PDU DHCP REQUEST saindo de ${host.label}…`, 'info');
+      await sleep(900);
+      if (playback.aborted) throw new Error('aborted');
+
+      showTransformPanel('DHCP · Renovação (T1)', steps, 1);
+      setPduView(
+        'dhcp',
+        `REQUEST<br><strong>${host.ip}</strong>`,
+        `<strong>UDP 68→67</strong> · ${host.label} → ${server.label}`
+      );
+
+      for (let i = 0; i < path.length - 1; i++) {
+        if (playback.aborted) throw new Error('aborted');
+        const from = getDevice(path[i]);
+        const to = getDevice(path[i + 1]);
+        setPduView(
+          'dhcp',
+          `REQUEST ${host.ip}`,
+          `<strong>DHCP REQUEST</strong> · ${from.label} → ${to.label}`
+        );
+        log(`  ↳ REQUEST ${from.label} → ${to.label}`, 'info');
+        await movePdu(from, to, 1100);
+        await sleep(200);
+      }
+
+      placePduAt(server);
+      setPduView(
+        'dhcp-ack',
+        `ACK<br><strong>${host.ip}</strong>`,
+        `<strong>${server.label}</strong> · concede de novo o IP`
+      );
+      log(`📬 ${server.label} processa REQUEST e gera ACK.`, 'ok');
+      await sleep(1000);
+      if (playback.aborted) throw new Error('aborted');
+
+      showTransformPanel('DHCP · Renovação (T1)', steps, 2);
+      const reverse = [...path].reverse();
+      for (let i = 0; i < reverse.length - 1; i++) {
+        if (playback.aborted) throw new Error('aborted');
+        const from = getDevice(reverse[i]);
+        const to = getDevice(reverse[i + 1]);
+        setPduView(
+          'dhcp-ack',
+          `ACK ${host.ip}`,
+          `<strong>DHCP ACK</strong> · ${from.label} → ${to.label}`
+        );
+        log(`  ↳ ACK ${from.label} → ${to.label}`, 'info');
+        await movePdu(from, to, 1100);
+        await sleep(200);
+      }
+
+      placePduAt(host);
+      showTransformPanel('DHCP · Renovação (T1)', steps, 3);
+      setPduView(
+        'dhcp-ack',
+        `Lease OK<br>${host.ip}`,
+        `<strong>${host.label}</strong> · concessão renovada`
+      );
+      await sleep(1200);
+    } catch (e) {
+      if (e && e.message === 'aborted') {
+        aborted = true;
+        log('⏹ Animação de renovação DHCP interrompida.', 'warn');
+      } else if (e) {
+        console.error(e);
+      }
+    } finally {
+      document.getElementById(host.id)?.classList.remove('dhcp-renewing');
+      document.getElementById(server.id)?.classList.remove('dhcp-renewing');
+      finishSimulationVisual();
+    }
+    return { aborted, skippedVisual: false };
+  }
+
+  // Monitor de leases: T1 (50%) → renovação animada; 100% → expira
+  const dhcpLeaseMonitor = {
+    timer: null,
+    queue: [],
+    busy: false
+  };
+
+  function ensureDhcpLeaseMonitor() {
+    if (dhcpLeaseMonitor.timer) return;
+    dhcpLeaseMonitor.timer = setInterval(tickDhcpLeases, 400);
+  }
+
+  function tickDhcpLeases() {
+    const now = Date.now();
+    let propsNeedRefresh = false;
+
+    state.devices.forEach(h => {
+      if (h.type !== 'host' || h.ipMode !== 'dhcp' || !h.dhcpLease || !h.ip) return;
+      const L = h.dhcpLease;
+      if (!L.grantedAt && L.expiresAt && L.leaseSeconds) {
+        L.grantedAt = L.expiresAt - L.leaseSeconds * 1000;
+      }
+
+      // expira
+      if (L.expiresAt && now >= L.expiresAt && !L.renewInProgress) {
+        log(`⏰ Lease de ${h.label} (${h.ip}) expirou. Endereço liberado.`, 'warn');
+        releaseDhcpForHost(h, { silent: true });
+        log(`DHCP: ${h.label} ficou sem IP. Use "Obter IP" ou aguarde se o servidor voltar.`, 'err');
+        propsNeedRefresh = true;
+        return;
+      }
+
+      // T1 = 50% do lease
+      const t1 = leaseT1At(L);
+      if (t1 != null && now >= t1 && !L.t1Fired && !L.renewInProgress) {
+        L.t1Fired = true; // evita disparos múltiplos neste ciclo de lease
+        dhcpLeaseMonitor.queue.push(h.id);
+      }
+    });
+
+    // atualiza barra de lease no painel se host DHCP selecionado
+    updateDhcpLeaseUi();
+
+    if (propsNeedRefresh && state.selectedId) {
+      const sel = getDevice(state.selectedId);
+      if (sel && (sel.type === 'host' || sel.type === 'dhcp')) renderProperties();
+    }
+
+    processDhcpRenewQueue();
+  }
+
+  async function processDhcpRenewQueue() {
+    if (dhcpLeaseMonitor.busy) return;
+    if (playback.running) return;
+    const id = dhcpLeaseMonitor.queue.shift();
+    if (!id) return;
+    const host = getDevice(id);
+    if (!host || !host.dhcpLease || !host.ip) return;
+
+    dhcpLeaseMonitor.busy = true;
+    try {
+      await performDhcpRenewal(host, { animate: true });
+    } finally {
+      dhcpLeaseMonitor.busy = false;
+      // processa próximo da fila
+      if (dhcpLeaseMonitor.queue.length) {
+        setTimeout(() => processDhcpRenewQueue(), 300);
+      }
+    }
+  }
+
+  function updateDhcpLeaseUi() {
+    const bar = document.getElementById('dhcp-lease-progress');
+    const t1El = document.getElementById('dhcp-t1-info');
+    if (!bar && !t1El) return;
+    const dev = getDevice(state.selectedId);
+    if (!dev || dev.type !== 'host' || !dev.dhcpLease) return;
+    const L = dev.dhcpLease;
+    const g = leaseGrantedAt(L);
+    const total = (L.leaseSeconds || 1) * 1000;
+    const elapsed = g != null ? Date.now() - g : 0;
+    const pct = Math.max(0, Math.min(100, (elapsed / total) * 100));
+    const t1 = leaseT1At(L);
+    const untilT1 = t1 != null ? t1 - Date.now() : null;
+    const left = (L.expiresAt || 0) - Date.now();
+
+    if (bar) {
+      const span = bar.querySelector('span');
+      if (span) span.style.width = pct + '%';
+      bar.classList.toggle('t1', pct >= 50);
+    }
+    if (t1El) {
+      if (L.renewInProgress) {
+        t1El.textContent = 'Renovando lease agora (T1)…';
+      } else if (untilT1 != null && untilT1 > 0) {
+        t1El.textContent = `Próxima renovação (T1) em ≈ ${formatLease(Math.ceil(untilT1 / 1000))} · expira em ≈ ${formatLease(Math.max(0, Math.ceil(left / 1000)))}`;
+      } else if (left > 0) {
+        t1El.textContent = `T1 já passou · expira em ≈ ${formatLease(Math.ceil(left / 1000))} (se a renovação falhou)`;
+      } else {
+        t1El.textContent = 'Lease expirado';
+      }
+    }
+  }
+
+  function releaseDhcpForHost(host, { silent = false } = {}) {
+    if (!host || host.type !== 'host') return { ok: false, msg: 'Dispositivo inválido.' };
+    const lease = host.dhcpLease;
+    if (lease?.serverId) {
+      const server = getDevice(lease.serverId);
+      if (server?.type === 'dhcp') {
+        const cfg = ensureDhcpConfig(server);
+        Object.keys(cfg.leases).forEach(ip => {
+          if (cfg.leases[ip].hostId === host.id) delete cfg.leases[ip];
+        });
+      }
+    } else {
+      // remove em qualquer servidor que tenha lease deste host
+      state.devices.filter(d => d.type === 'dhcp').forEach(s => {
+        const cfg = ensureDhcpConfig(s);
+        Object.keys(cfg.leases).forEach(ip => {
+          if (cfg.leases[ip].hostId === host.id) delete cfg.leases[ip];
+        });
+      });
+    }
+
+    const prev = host.ip;
+    host.ip = '';
+    host.gateway = '';
+    host.dns = '';
+    host.dhcpLease = null;
+    updateDeviceIpLabel(host);
+    markDirty();
+    if (!silent) {
+      log(`DHCP RELEASE: ${host.label} liberou o endereço ${prev || '(nenhum)'}.`, 'action');
+    }
+    return { ok: true };
+  }
+
+  // ========== GRAFOS ==========
+  function getDevice(id) {
+    return state.devices.find(d => d.id === id);
+  }
+
+  function buildAdj(filterFn) {
+    const adj = {};
+    state.devices.forEach(d => { adj[d.id] = []; });
+    state.links.forEach(l => {
+      const a = getDevice(l.from);
+      const b = getDevice(l.to);
+      if (!a || !b) return;
+      if (filterFn && !filterFn(a, b, l)) return;
+      adj[l.from].push(l.to);
+      adj[l.to].push(l.from);
+    });
+    return adj;
+  }
+
+  function findPath(startId, endId, adj) {
+    if (!adj) {
+      adj = buildAdj();
+    }
+    const queue = [[startId]];
+    const visited = new Set([startId]);
+    while (queue.length) {
+      const path = queue.shift();
+      const last = path[path.length - 1];
+      if (last === endId) return path;
+      for (const nei of (adj[last] || [])) {
+        if (!visited.has(nei)) {
+          visited.add(nei);
+          queue.push([...path, nei]);
+        }
+      }
+    }
+    return null;
+  }
+
+  function isConnected(devId) {
+    return state.links.some(l => l.from === devId || l.to === devId);
+  }
+
+  function neighborsOf(devId) {
+    const out = [];
+    state.links.forEach(l => {
+      if (l.from === devId) out.push(getDevice(l.to));
+      else if (l.to === devId) out.push(getDevice(l.from));
+    });
+    return out.filter(Boolean);
+  }
+
+  /**
+   * Domínio de broadcast L2: a partir de um dispositivo, expande por switches.
+   * Não atravessa roteadores (cada porta do roteador = outro domínio).
+   */
+  function getL2Domain(startId) {
+    const members = new Set();
+    const queue = [startId];
+    members.add(startId);
+    while (queue.length) {
+      const id = queue.shift();
+      const dev = getDevice(id);
+      if (!dev) continue;
+      // se for roteador e não for o start, não expande além (mas o start router entra)
+      for (const n of neighborsOf(id)) {
+        if (members.has(n.id)) continue;
+        if (n.type === 'router' && id !== startId) {
+          // vizinho roteador: inclui a interface/roteador no domínio, mas não atravessa
+          members.add(n.id);
+          continue;
+        }
+        if (dev.type === 'router' && n.type !== 'switch' && n.type !== 'host' && n.type !== 'dhcp' && n.id !== startId) {
+          // a partir do roteador, só inclui vizinhos diretos daquela "porta" no início
+        }
+        // Atravessa apenas através de switches (e inclui hosts/routers no domínio)
+        if (n.type === 'switch') {
+          members.add(n.id);
+          queue.push(n.id);
+        } else if (dev.type === 'switch' || id === startId) {
+          // hosts/routers ligados ao switch (ou vizinho direto do start)
+          members.add(n.id);
+          if (n.type === 'switch') queue.push(n.id);
+        }
+      }
+    }
+    return members;
+  }
+
+  /**
+   * Domínio L2 a partir de um host: switches + hosts/routers no mesmo segmento.
+   * Não atravessa roteadores.
+   */
+  function getBroadcastDomainFrom(startId) {
+    const members = new Set([startId]);
+    const queue = [startId];
+    while (queue.length) {
+      const id = queue.shift();
+      for (const n of neighborsOf(id)) {
+        if (members.has(n.id)) continue;
+        // Nunca atravessa roteador para outro lado
+        const current = getDevice(id);
+        if (current.type === 'router') {
+          // do roteador só vemos vizinhos diretos já adicionados no start expansion
+          continue;
+        }
+        if (n.type === 'router') {
+          members.add(n.id);
+          // não entra na fila — não cruza o roteador
+          continue;
+        }
+        members.add(n.id);
+        if (n.type === 'switch') queue.push(n.id);
+        else if (n.type === 'host' && current.type === 'switch') {
+          // host no mesmo switch — já adicionado
+        }
+      }
+    }
+    return members;
+  }
+
+  /** Coleta todos os "endpoints" de IP no domínio L2 de um host/router porta */
+  function collectIpEndpoints() {
+    // lista de { deviceId, label, ip, mask, kind: 'host'|'iface'|'dhcp', ifaceName? }
+    const list = [];
+    state.devices.forEach(d => {
+      if (d.type === 'host' && d.ip) {
+        list.push({
+          deviceId: d.id,
+          label: d.label,
+          ip: d.ip,
+          mask: d.mask || '255.255.255.0',
+          kind: 'host'
+        });
+      }
+      if (d.type === 'dhcp' && d.ip) {
+        list.push({
+          deviceId: d.id,
+          label: d.label,
+          ip: d.ip,
+          mask: d.mask || d.dhcp?.mask || '255.255.255.0',
+          kind: 'dhcp'
+        });
+      }
+      if (d.type === 'router' && d.interfaces) {
+        d.interfaces.forEach(iface => {
+          if (iface.ip) {
+            list.push({
+              deviceId: d.id,
+              label: `${d.label} (${iface.name})`,
+              ip: iface.ip,
+              mask: iface.mask || '255.255.255.0',
+              kind: 'iface',
+              ifaceName: iface.name,
+              linkId: iface.linkId
+            });
+          }
+        });
+      }
+    });
+    return list;
+  }
+
+  function findRouterByIp(ip) {
+    return state.devices.find(d =>
+      d.type === 'router' && d.interfaces.some(i => i.ip === ip)
+    );
+  }
+
+  function getRouterIfaceByIp(router, ip) {
+    return router?.interfaces?.find(i => i.ip === ip) || null;
+  }
+
+  /** Redes diretamente conectadas a um roteador */
+  function getDirectNetworks(router) {
+    const nets = [];
+    router.interfaces.forEach(iface => {
+      if (!iface.ip) return;
+      const key = netKey(iface.ip, iface.mask || '255.255.255.0');
+      if (!key) return;
+      nets.push({
+        key,
+        network: getNetworkAddr(iface.ip, iface.mask || '255.255.255.0'),
+        mask: iface.mask || '255.255.255.0',
+        prefix: maskToPrefix(iface.mask || '255.255.255.0'),
+        iface,
+        via: null,
+        type: 'Direta'
+      });
+    });
+    return nets;
+  }
+
+  /**
+   * Tabela de rotas simplificada:
+   * - redes diretas
+   * - redes aprendidas via roteadores adjacentes (BFS, como "redes conectadas" + vizinhança)
+   */
+  function buildRoutingTable(router) {
+    const routes = new Map(); // netKey -> route
+    getDirectNetworks(router).forEach(r => {
+      routes.set(r.key, r);
+    });
+
+    // BFS por roteadores adjacentes
+    const visited = new Set([router.id]);
+    const queue = [{ id: router.id, via: null, hop: 0 }];
+
+    while (queue.length) {
+      const { id, via, hop } = queue.shift();
+      const r = getDevice(id);
+      if (!r || r.type !== 'router') continue;
+
+      getDirectNetworks(r).forEach(net => {
+        if (!routes.has(net.key)) {
+          routes.set(net.key, {
+            ...net,
+            type: hop === 0 ? 'Direta' : `Via ${via || r.label}`,
+            via: hop === 0 ? null : (via || r.label),
+            nextHopRouterId: hop === 0 ? null : id
+          });
+        }
+      });
+
+      // vizinhos roteadores
+      neighborsOf(id).forEach(n => {
+        if (n.type === 'router' && !visited.has(n.id)) {
+          visited.add(n.id);
+          const viaLabel = hop === 0 ? n.label : (via || r.label);
+          queue.push({ id: n.id, via: hop === 0 ? n.label : via, hop: hop + 1 });
+        }
+      });
+    }
+    return [...routes.values()];
+  }
+
+  function routerHasRouteTo(router, destIp, destMask) {
+    const destNet = getNetworkAddr(destIp, destMask || '255.255.255.0');
+    if (destNet === null) return { ok: false, route: null };
+    const table = buildRoutingTable(router);
+    // match por network number (usando máscara da rota)
+    for (const r of table) {
+      if (r.network === destNet) return { ok: true, route: r };
+      // também: se destino cai na rede da rota com a máscara da rota
+      const destOnRoute = getNetworkAddr(destIp, r.mask);
+      if (destOnRoute !== null && destOnRoute === r.network) return { ok: true, route: r };
+    }
+    return { ok: false, route: null };
+  }
+
+  // ========== VALIDAÇÃO DE CABO ==========
+  function canConnect(d1, d2) {
+    if (d1.id === d2.id) {
+      return { ok: false, msg: 'Não é possível conectar um dispositivo a ele mesmo.' };
+    }
+    const allowed = CABLE_RULES[d1.type];
+    if (!allowed || !allowed.has(d2.type)) {
+      return {
+        ok: false,
+        msg: `Cabo inválido: ${d1.type} → ${d2.type} não é permitido. Use Host↔Switch, DHCP↔Switch, Switch↔Roteador, Switch↔Switch ou Roteador↔Roteador.`
+      };
+    }
+    // Host ↔ Host proibido explicitamente
+    if (d1.type === 'host' && d2.type === 'host') {
+      return { ok: false, msg: 'Não é permitido conectar Host → Host. Use um switch ou roteador entre eles.' };
+    }
+    if (d1.type === 'dhcp' && d2.type === 'dhcp') {
+      return { ok: false, msg: 'Não é permitido conectar DHCP → DHCP diretamente. Use um switch entre eles.' };
+    }
+    if ((d1.type === 'host' && d2.type === 'dhcp') || (d1.type === 'dhcp' && d2.type === 'host')) {
+      return { ok: false, msg: 'Não é permitido conectar Host → DHCP diretamente. Use um switch entre eles.' };
+    }
+    return { ok: true };
+  }
+
+  // ========== DETECÇÃO DE LOOP ENTRE SWITCHES ==========
+  function detectSwitchLoops() {
+    const issues = [];
+    const switches = state.devices.filter(d => d.type === 'switch');
+    if (switches.length < 3) {
+      // ainda pode haver loop SW1-SW2 com multi-edge, mas com um link só não
+    }
+
+    // Grafo só de switches
+    const swIds = new Set(switches.map(s => s.id));
+    const adj = {};
+    switches.forEach(s => { adj[s.id] = []; });
+    state.links.forEach(l => {
+      if (swIds.has(l.from) && swIds.has(l.to)) {
+        adj[l.from].push(l.to);
+        adj[l.to].push(l.from);
+      }
+    });
+
+    // Detecta ciclo com DFS
+    const visited = new Set();
+    const parent = {};
+
+    function dfs(u, p) {
+      visited.add(u);
+      parent[u] = p;
+      for (const v of adj[u] || []) {
+        if (v === p) continue;
+        if (visited.has(v)) {
+          // reconstruir ciclo
+          const cycle = [v, u];
+          let cur = u;
+          while (cur !== v && parent[cur] != null) {
+            cur = parent[cur];
+            cycle.push(cur);
+            if (cycle.length > 20) break;
+          }
+          const labels = cycle.map(id => getDevice(id)?.label || id);
+          // dedup mensagem
+          const key = [...new Set(cycle)].sort().join(',');
+          return key + '|' + labels.join(' — ');
+        }
+        const found = dfs(v, u);
+        if (found) return found;
+      }
+      return null;
+    }
+
+    const seenCycles = new Set();
+    for (const s of switches) {
+      if (visited.has(s.id)) continue;
+      const found = dfs(s.id, null);
+      if (found) {
+        const [key, path] = found.split('|');
+        if (!seenCycles.has(key)) {
+          seenCycles.add(key);
+          issues.push({
+            level: 'err',
+            msg: `Loop detectado entre switches: ${path}. (Sem STP, isso causa tempestade de broadcast.)`,
+            devices: key.split(',')
+          });
+        }
+      }
+    }
+
+    // multi-link entre mesmo par de switches
+    const pairCount = {};
+    state.links.forEach(l => {
+      const a = getDevice(l.from);
+      const b = getDevice(l.to);
+      if (a?.type === 'switch' && b?.type === 'switch') {
+        const key = [a.id, b.id].sort().join('|');
+        pairCount[key] = (pairCount[key] || 0) + 1;
+      }
+    });
+    Object.entries(pairCount).forEach(([key, count]) => {
+      if (count > 1) {
+        const [id1, id2] = key.split('|');
+        issues.push({
+          level: 'err',
+          msg: `Loop detectado entre switches: múltiplos cabos entre ${getDevice(id1)?.label} e ${getDevice(id2)?.label}.`,
+          devices: [id1, id2]
+        });
+      }
+    });
+
+    return issues;
+  }
+
+  // ========== VALIDAÇÃO COMPLETA DA TOPOLOGIA ==========
+  function validateTopology() {
+    const issues = [];
+    const endpoints = collectIpEndpoints();
+
+    // --- 1.3 / 1.4 Rede e broadcast ---
+    endpoints.forEach(ep => {
+      validateIpAssignment(ep.ip, ep.mask, ep.label).forEach(iss => {
+        issues.push({ ...iss, devices: [ep.deviceId] });
+      });
+    });
+
+    // --- 1.1 IP único na mesma rede ---
+    const byNetIp = {}; // netKey|ip -> endpoint
+    endpoints.forEach(ep => {
+      const nk = netKey(ep.ip, ep.mask);
+      if (!nk) return;
+      const key = nk + '|' + ep.ip;
+      if (byNetIp[key]) {
+        issues.push({
+          level: 'err',
+          msg: `Conflito de IP: o endereço ${ep.ip} já está sendo utilizado por ${byNetIp[key].label}.`,
+          devices: [ep.deviceId, byNetIp[key].deviceId]
+        });
+      } else {
+        byNetIp[key] = ep;
+      }
+    });
+
+    // Também: mesmo IP em qualquer lugar (comum em labs)
+    const byIp = {};
+    endpoints.forEach(ep => {
+      if (byIp[ep.ip] && byIp[ep.ip].deviceId !== ep.deviceId) {
+        // se redes diferentes, ainda é conflito global de IP
+        const already = issues.some(i =>
+          i.msg.includes(`Conflito de IP: o endereço ${ep.ip}`)
+        );
+        if (!already) {
+          issues.push({
+            level: 'err',
+            msg: `Conflito de IP: o endereço ${ep.ip} já está sendo utilizado por ${byIp[ep.ip].label}.`,
+            devices: [ep.deviceId, byIp[ep.ip].deviceId]
+          });
+        }
+      } else if (!byIp[ep.ip]) {
+        byIp[ep.ip] = ep;
+      }
+    });
+
+    // --- 1.2 Gateway único por rede (somente LANs reais, não enlace R↔R) ---
+    // Em /30 ou /31 entre roteadores é NORMAL haver 2 IPs na mesma rede (ponto a ponto).
+    // Só avisa quando a rede parece uma LAN (há host) ou quando 2+ gateways não são p2p.
+    const routersOnNet = {}; // netKey -> [{router, iface}]
+    state.devices.filter(d => d.type === 'router').forEach(r => {
+      r.interfaces.forEach(iface => {
+        if (!iface.ip) return;
+        const nk = netKey(iface.ip, iface.mask || '255.255.255.0');
+        if (!nk) return;
+        if (!routersOnNet[nk]) routersOnNet[nk] = [];
+        routersOnNet[nk].push({ router: r, iface });
+      });
+    });
+    Object.entries(routersOnNet).forEach(([nk, list]) => {
+      const uniqRouters = [...new Map(list.map(x => [x.router.id, x])).values()];
+      if (uniqRouters.length < 2) return;
+
+      // Enlace ponto a ponto: as duas interfaces estão no mesmo cabo R↔R
+      if (uniqRouters.length === 2) {
+        const [a, b] = uniqRouters;
+        if (a.iface.linkId && a.iface.linkId === b.iface.linkId) {
+          return; // 10.0.0.1/30 ↔ 10.0.0.2/30 no mesmo link — correto
+        }
+        // Cabo direto entre os dois roteadores e cada iface ligada a esse par
+        const p2pLink = state.links.find(l =>
+          (l.from === a.router.id && l.to === b.router.id) ||
+          (l.from === b.router.id && l.to === a.router.id)
+        );
+        if (p2pLink &&
+            (a.iface.linkId === p2pLink.id || !a.iface.linkId) &&
+            (b.iface.linkId === p2pLink.id || !b.iface.linkId)) {
+          // Se as ifaces com IP nesta rede estão (ou deveriam estar) no link R↔R
+          const aOnP2P = !a.iface.linkId || a.iface.linkId === p2pLink.id;
+          const bOnP2P = !b.iface.linkId || b.iface.linkId === p2pLink.id;
+          if (aOnP2P && bOnP2P) {
+            const prefix = maskToPrefix(a.iface.mask || '255.255.255.0');
+            // /30 e /31 são tipicamente WAN; não tratar como LAN com 2 gateways
+            if (prefix !== null && prefix >= 30) return;
+          }
+        }
+      }
+
+      // Rede /30 ou /31 só com roteadores (sem hosts) = WAN, não LAN
+      const prefixStr = nk.split('/')[1];
+      const prefix = prefixStr != null ? parseInt(prefixStr, 10) : null;
+      const hostsOnNet = state.devices.filter(d =>
+        d.type === 'host' && d.ip && netKey(d.ip, d.mask || '255.255.255.0') === nk
+      );
+      if (hostsOnNet.length === 0 && prefix !== null && prefix >= 30) {
+        return;
+      }
+
+      // Só é problema de "dois gateways" se for LAN (há host) ou rede grande compartilhada via switch
+      if (hostsOnNet.length === 0 && uniqRouters.length === 2) {
+        // sem hosts e dois roteadores: só alerta se NÃO estiverem ligados diretamente
+        const [a, b] = uniqRouters;
+        const direct = state.links.some(l =>
+          (l.from === a.router.id && l.to === b.router.id) ||
+          (l.from === b.router.id && l.to === a.router.id)
+        );
+        if (direct) return;
+      }
+
+      if (hostsOnNet.length === 0) return; // sem hosts, não há "gateway padrão de LAN" em conflito
+
+      const labels = uniqRouters.map(x => `${x.router.label}(${x.iface.ip})`).join(', ');
+      issues.push({
+        level: 'warn',
+        msg: `Dois gateways foram encontrados na rede ${nk}: ${labels}. Em uma mesma LAN só deve existir um gateway padrão.`,
+        devices: uniqRouters.map(x => x.router.id)
+      });
+    });
+
+    // --- 2. Máscaras iguais na mesma LAN (domínio L2 + mesma rede lógica) ---
+    state.devices.filter(d => d.type === 'host' && d.ip).forEach(host => {
+      const domain = getBroadcastDomainFrom(host.id);
+      const peers = endpoints.filter(ep => domain.has(ep.deviceId) && ep.deviceId !== host.id);
+      peers.forEach(ep => {
+        const sameNetNum =
+          getNetworkAddr(host.ip, host.mask || '255.255.255.0') ===
+          getNetworkAddr(ep.ip, ep.mask);
+        // se caem no mesmo número de rede com alguma máscara, mas máscaras diferem
+        const hostMaskN = ipToNumber(host.mask || '255.255.255.0');
+        const epMaskN = ipToNumber(ep.mask);
+        if (hostMaskN !== null && epMaskN !== null && hostMaskN !== epMaskN) {
+          // só reclama se estiverem no mesmo segmento L2 e IPs "parecem" da mesma LAN
+          const n1 = getNetworkAddr(host.ip, host.mask || '255.255.255.0');
+          const n2 = getNetworkAddr(ep.ip, host.mask || '255.255.255.0');
+          const n3 = getNetworkAddr(host.ip, ep.mask);
+          const n4 = getNetworkAddr(ep.ip, ep.mask);
+          if ((n1 !== null && n1 === n2) || (n3 !== null && n3 === n4) || sameNetNum) {
+            const key = [host.id, ep.deviceId].sort().join('|') + '|mask';
+            if (!issues.some(i => i._key === key)) {
+              issues.push({
+                level: 'err',
+                msg: `Os dispositivos da mesma LAN possuem máscaras diferentes (${host.label}: ${host.mask || '255.255.255.0'}, ${ep.label}: ${ep.mask}).`,
+                devices: [host.id, ep.deviceId],
+                _key: key
+              });
+            }
+          }
+        }
+      });
+    });
+
+    // --- 3. Interfaces do roteador em redes diferentes ---
+    state.devices.filter(d => d.type === 'router').forEach(r => {
+      const ifaces = r.interfaces.filter(i => i.ip);
+      for (let i = 0; i < ifaces.length; i++) {
+        for (let j = i + 1; j < ifaces.length; j++) {
+          const a = ifaces[i];
+          const b = ifaces[j];
+          const na = getNetworkAddr(a.ip, a.mask || '255.255.255.0');
+          const nb = getNetworkAddr(b.ip, b.mask || '255.255.255.0');
+          // mesma rede se um está na rede do outro (com máscara de cada)
+          const same =
+            (na !== null && na === getNetworkAddr(b.ip, a.mask || '255.255.255.0')) ||
+            (nb !== null && nb === getNetworkAddr(a.ip, b.mask || '255.255.255.0'));
+          if (same) {
+            issues.push({
+              level: 'err',
+              msg: `As interfaces ${a.name} e ${b.name} de ${r.label} pertencem à mesma rede.`,
+              devices: [r.id]
+            });
+          }
+        }
+      }
+    });
+
+    // --- 4. Enlace entre roteadores deve ser rede exclusiva ---
+    state.links.forEach(l => {
+      const a = getDevice(l.from);
+      const b = getDevice(l.to);
+      if (!a || !b) return;
+      if (a.type === 'router' && b.type === 'router') {
+        const ia = a.interfaces.find(i => i.linkId === l.id);
+        const ib = b.interfaces.find(i => i.linkId === l.id);
+        if (ia?.ip && ib?.ip) {
+          // devem estar na mesma rede entre si
+          if (!isSameNetwork(
+            { ip: ia.ip, mask: ia.mask },
+            { ip: ib.ip, mask: ib.mask }
+          )) {
+            issues.push({
+              level: 'err',
+              msg: `Enlace ${a.label} ↔ ${b.label}: as interfaces não estão na mesma subrede do enlace.`,
+              devices: [a.id, b.id]
+            });
+          }
+          const linkNet = netKey(ia.ip, ia.mask || '255.255.255.0');
+          // rede do enlace não deve aparecer em LANs (hosts ou outras ifaces)
+          endpoints.forEach(ep => {
+            if (ep.deviceId === a.id || ep.deviceId === b.id) {
+              // mesma interface do enlace ok; outras ifaces do mesmo router já cobertas pela regra 3
+              if (ep.kind === 'iface' && (ep.ip === ia.ip || ep.ip === ib.ip)) return;
+            }
+            const epNet = netKey(ep.ip, ep.mask);
+            if (linkNet && epNet && linkNet === epNet && ep.deviceId !== a.id && ep.deviceId !== b.id) {
+              issues.push({
+                level: 'err',
+                msg: `O enlace entre roteadores (${a.label} ↔ ${b.label}) deve utilizar uma rede exclusiva. A rede ${linkNet} também é usada por ${ep.label}.`,
+                devices: [a.id, b.id, ep.deviceId]
+              });
+            }
+            // hosts na mesma rede do enlace
+            if (ep.kind === 'host' && linkNet && epNet === linkNet) {
+              const already = issues.some(i =>
+                i.msg.includes('rede exclusiva') && i.devices.includes(ep.deviceId)
+              );
+              if (!already) {
+                issues.push({
+                  level: 'err',
+                  msg: `O enlace entre roteadores deve utilizar uma rede exclusiva. A rede ${linkNet} também é usada por ${ep.label}.`,
+                  devices: [a.id, b.id, ep.deviceId]
+                });
+              }
+            }
+          });
+          // aviso se não for /30 ou /31
+          const p = maskToPrefix(ia.mask || '255.255.255.0');
+          if (p !== null && p < 30) {
+            issues.push({
+              level: 'warn',
+              msg: `Enlace ${a.label} ↔ ${b.label}: recomenda-se máscara /30 ou /31 (atual: /${p}).`,
+              devices: [a.id, b.id]
+            });
+          }
+        } else if (!ia?.ip || !ib?.ip) {
+          issues.push({
+            level: 'warn',
+            msg: `Enlace ${a.label} ↔ ${b.label}: configure IPs nas interfaces do enlace entre roteadores.`,
+            devices: [a.id, b.id]
+          });
+        }
+      }
+    });
+
+    // --- 5. Gateway do host na mesma rede ---
+    state.devices.filter(d => d.type === 'host').forEach(h => {
+      if (h.ipMode === 'dhcp' && !h.ip) {
+        issues.push({
+          level: 'warn',
+          msg: `${h.label} está em modo DHCP, mas ainda não obteve endereço. Use "Obter IP via DHCP".`,
+          devices: [h.id]
+        });
+      }
+      if (h.ipMode === 'dhcp' && h.dhcpLease?.expiresAt && h.dhcpLease.expiresAt < Date.now()) {
+        issues.push({
+          level: 'warn',
+          msg: `${h.label}: lease DHCP expirado. Renove o endereço.`,
+          devices: [h.id]
+        });
+      }
+      if (h.ip && h.gateway) {
+        const mask = h.mask || '255.255.255.0';
+        const hNet = getNetworkAddr(h.ip, mask);
+        const gNet = getNetworkAddr(h.gateway, mask);
+        if (hNet === null || gNet === null || hNet !== gNet) {
+          issues.push({
+            level: 'err',
+            msg: `Gateway fora da rede do host (${h.label}: IP ${h.ip}, gateway ${h.gateway}).`,
+            devices: [h.id]
+          });
+        } else {
+          // gateway deve existir como interface de roteador
+          const gwR = findRouterByIp(h.gateway);
+          if (!gwR) {
+            issues.push({
+              level: 'err',
+              msg: `Gateway ${h.gateway} de ${h.label} não corresponde a nenhum IP de interface de roteador.`,
+              devices: [h.id]
+            });
+          }
+        }
+      }
+    });
+
+    // --- 5b. Servidores DHCP (escopo, range, lease) ---
+    state.devices.filter(d => d.type === 'dhcp').forEach(srv => {
+      issues.push(...validateDhcpScope(srv));
+      // servidor no mesmo L2 de hosts em modo DHCP
+      if (srv.ip && isConnected(srv.id)) {
+        const domain = getBroadcastDomainFrom(srv.id);
+        const dhcpHosts = state.devices.filter(
+          h => h.type === 'host' && h.ipMode === 'dhcp' && domain.has(h.id)
+        );
+        if (dhcpHosts.length && ensureDhcpConfig(srv).enabled === false) {
+          issues.push({
+            level: 'warn',
+            msg: `${srv.label} está desativado, mas há hosts DHCP no mesmo segmento.`,
+            devices: [srv.id, ...dhcpHosts.map(h => h.id)]
+          });
+        }
+      }
+    });
+
+    // --- 9. Equipamentos desconectados ---
+    state.devices.forEach(d => {
+      if (!isConnected(d.id) && state.devices.length > 1) {
+        issues.push({
+          level: 'warn',
+          msg: `O ${d.label} não está conectado à rede.`,
+          devices: [d.id]
+        });
+      }
+    });
+
+    // --- 11. Loops de switch ---
+    issues.push(...detectSwitchLoops());
+
+    // remove _key internos
+    return issues.map(({ _key, ...rest }) => rest);
+  }
+
+  function renderValidation(issues, { logIssues = false } = {}) {
+    state.lastIssues = issues;
+    const list = document.getElementById('validation-list');
+    const badge = document.getElementById('val-badge');
+    const errs = issues.filter(i => i.level === 'err');
+    const warns = issues.filter(i => i.level === 'warn');
+
+    // marca dispositivos com erro
+    document.querySelectorAll('.device').forEach(el => el.classList.remove('has-error'));
+    const errDevs = new Set();
+    errs.forEach(i => (i.devices || []).forEach(id => errDevs.add(id)));
+    errDevs.forEach(id => document.getElementById(id)?.classList.add('has-error'));
+
+    if (!issues.length) {
+      badge.textContent = 'OK';
+      badge.className = 'val-badge ok';
+      list.innerHTML = '<div class="val-item ok">Nenhum problema detectado. Topologia consistente.</div>';
+    } else {
+      if (errs.length) {
+        badge.textContent = `${errs.length} erro(s)`;
+        badge.className = 'val-badge err';
+      } else {
+        badge.textContent = `${warns.length} aviso(s)`;
+        badge.className = 'val-badge warn';
+      }
+      list.innerHTML = issues.map(i =>
+        `<div class="val-item ${i.level}">${i.level === 'err' ? '❌' : '⚠️'} ${i.msg}</div>`
+      ).join('');
+    }
+
+    if (logIssues) {
+      if (!issues.length) {
+        log('Validação: topologia OK — nenhum problema detectado.', 'ok');
+      } else {
+        log(`Validação: ${errs.length} erro(s), ${warns.length} aviso(s).`, errs.length ? 'err' : 'warn');
+        issues.forEach(i => log((i.level === 'err' ? '❌ ' : '⚠️ ') + i.msg, i.level === 'err' ? 'err' : 'warn'));
+      }
+    }
+  }
+
+  function runValidation(logIssues = false) {
+    const issues = validateTopology();
+    renderValidation(issues, { logIssues });
+    return issues;
+  }
+
+  // ========== LOG / HISTÓRICO ==========
+  function log(msg, type = '') {
+    const time = new Date().toLocaleTimeString('pt-BR');
+    state.history.push({ time, msg, type });
+    if (state.history.length > 300) state.history.shift();
+    renderLog();
+    persistLog();
+  }
+
+  function renderLog() {
+    const el = document.getElementById('log');
+    el.innerHTML = state.history.map(h => {
+      const cls = h.type === 'ok' ? 'ok'
+        : h.type === 'err' ? 'err'
+        : h.type === 'info' ? 'info'
+        : h.type === 'action' ? 'action'
+        : h.type === 'warn' ? 'warn'
+        : '';
+      return `<div class="${cls}">[${h.time}] ${h.msg}</div>`;
+    }).join('');
+    el.scrollTop = el.scrollHeight;
+  }
+
+  function persistLog() {
+    try {
+      localStorage.setItem(LOG_KEY, JSON.stringify(state.history.slice(-150)));
+    } catch (_) { /* ignore */ }
+  }
+
+  function loadLog() {
+    try {
+      const raw = localStorage.getItem(LOG_KEY);
+      if (!raw) return;
+      const arr = JSON.parse(raw);
+      if (Array.isArray(arr)) state.history = arr;
+    } catch (_) { /* ignore */ }
+  }
+
+  // ========== MODO CONECTAR UI ==========
+  function updateConnectUI() {
+    const canvas = document.getElementById('canvas');
+    const banner = document.getElementById('connect-banner');
+    const step = document.getElementById('connect-step');
+    const btn = document.getElementById('btn-connect');
+    const isConnect = state.mode === 'connect';
+
+    canvas.classList.toggle('connect-mode', isConnect);
+    banner.classList.toggle('show', isConnect);
+    btn.classList.toggle('active', isConnect);
+    btn.textContent = isConnect ? '✓ Ligando… (clique p/ sair)' : '🔌 Modo Conectar';
+
+    document.querySelectorAll('.device').forEach(el => {
+      el.classList.remove('connect-from', 'connect-target-hint');
+    });
+
+    if (!isConnect) return;
+
+    if (state.connectFrom) {
+      const el = document.getElementById(state.connectFrom.id);
+      if (el) el.classList.add('connect-from');
+      step.textContent = `1º: ${state.connectFrom.label} selecionado → clique no 2º dispositivo para ligar o cabo`;
+      state.devices.forEach(d => {
+        if (d.id !== state.connectFrom.id) {
+          const check = canConnect(state.connectFrom, d);
+          if (check.ok) document.getElementById(d.id)?.classList.add('connect-target-hint');
+        }
+      });
+    } else {
+      step.textContent = 'Clique no primeiro dispositivo para iniciar a ligação';
+    }
+  }
+
+  function setMode(mode) {
+    state.mode = mode;
+    state.connectFrom = null;
+    updateConnectUI();
+  }
+
+  // ========== PERSISTÊNCIA ==========
+  function markDirty() {
+    state.dirty = true;
+    updateSaveStatus();
+    runValidation(false);
+  }
+
+  function updateSaveStatus() {
+    const el = document.getElementById('save-status');
+    if (state.lastSavedAt) {
+      const t = new Date(state.lastSavedAt).toLocaleTimeString('pt-BR');
+      if (state.dirty) {
+        el.textContent = `Alterações não salvas (último: ${t})`;
+        el.className = 'save-status dirty';
+      } else {
+        el.textContent = `Salvo às ${t}`;
+        el.className = 'save-status saved';
+      }
+    } else if (state.dirty || state.devices.length) {
+      el.textContent = 'Não salvo';
+      el.className = 'save-status dirty';
+    } else {
+      el.textContent = 'Nada salvo ainda';
+      el.className = 'save-status';
+    }
+  }
+
+  function serializeTopology() {
+    return {
+      version: 2,
+      savedAt: new Date().toISOString(),
+      nextId: state.nextId,
+      devices: state.devices.map(d => ({
+        id: d.id,
+        type: d.type,
+        x: d.x,
+        y: d.y,
+        label: d.label,
+        ip: d.ip,
+        mask: d.mask,
+        gateway: d.gateway,
+        dns: d.dns,
+        ipMode: d.ipMode,
+        dhcpLease: d.dhcpLease ? {
+          serverId: d.dhcpLease.serverId,
+          serverLabel: d.dhcpLease.serverLabel,
+          serverIp: d.dhcpLease.serverIp,
+          ip: d.dhcpLease.ip,
+          grantedAt: d.dhcpLease.grantedAt,
+          expiresAt: d.dhcpLease.expiresAt,
+          leaseSeconds: d.dhcpLease.leaseSeconds,
+          t1Fired: !!d.dhcpLease.t1Fired,
+          dns: d.dhcpLease.dns,
+          gateway: d.dhcpLease.gateway
+        } : null,
+        dhcp: d.dhcp ? {
+          enabled: !!d.dhcp.enabled,
+          poolStart: d.dhcp.poolStart || '',
+          poolEnd: d.dhcp.poolEnd || '',
+          mask: d.dhcp.mask || '',
+          gateway: d.dhcp.gateway || '',
+          dns: d.dhcp.dns || '',
+          lease: d.dhcp.lease || DEFAULT_LEASE_SEC,
+          leases: d.dhcp.leases ? { ...d.dhcp.leases } : {}
+        } : null,
+        interfaces: d.interfaces ? d.interfaces.map(i => ({
+          name: i.name,
+          ip: i.ip,
+          mask: i.mask,
+          linkId: i.linkId
+        })) : null
+      })),
+      links: state.links.map(l => ({ id: l.id, from: l.from, to: l.to }))
+    };
+  }
+
+  function saveTopology(silent = false) {
+    try {
+      const data = serializeTopology();
+      localStorage.setItem(STORAGE_KEY, JSON.stringify(data));
+      state.lastSavedAt = data.savedAt;
+      state.dirty = false;
+      updateSaveStatus();
+      if (!silent) log('Topologia salva neste navegador. Ao reabrir, continuará de onde parou.', 'ok');
+    } catch (e) {
+      log('Erro ao salvar: ' + e.message, 'err');
+    }
+  }
+
+  function clearCanvasDevices() {
+    document.querySelectorAll('.device').forEach(el => el.remove());
+  }
+
+  function applyTopology(data) {
+    if (!data || !Array.isArray(data.devices) || !Array.isArray(data.links)) {
+      throw new Error('Arquivo de topologia inválido.');
+    }
+    clearCanvasDevices();
+    state.devices = data.devices.map(d => {
+      const base = {
+        id: d.id,
+        type: d.type,
+        x: d.x || 40,
+        y: d.y || 40,
+        label: d.label || d.id,
+        ip: d.ip || '',
+        mask: d.mask,
+        gateway: d.gateway || '',
+        dns: d.dns || '',
+        ipMode: d.ipMode || (d.type === 'host' ? 'static' : undefined),
+        dhcpLease: d.dhcpLease || null,
+        dhcp: null,
+        interfaces: d.interfaces ? d.interfaces.map(i => ({ ...i })) : null
+      };
+      if (d.type === 'dhcp') {
+        base.mask = d.mask || d.dhcp?.mask || '255.255.255.0';
+        base.dhcp = {
+          ...defaultDhcpConfig(),
+          ...(d.dhcp || {}),
+          leases: d.dhcp?.leases ? { ...d.dhcp.leases } : {}
+        };
+      }
+      if (d.type === 'host') {
+        base.mask = d.mask || '255.255.255.0';
+        base.ipMode = d.ipMode === 'dhcp' ? 'dhcp' : 'static';
+      }
+      return base;
+    });
+    state.links = data.links.map(l => ({ id: l.id, from: l.from, to: l.to }));
+    state.nextId = data.nextId || (state.devices.length + state.links.length + 1);
+    state.selectedId = null;
+    state.selectedIds = [];
+    setMode('select');
+
+    state.devices.forEach(renderDevice);
+    updateLinks();
+    renderProperties();
+    updateSelectionUI();
+    runValidation(false);
+  }
+
+  function loadTopology() {
+    try {
+      const raw = localStorage.getItem(STORAGE_KEY);
+      if (!raw) return false;
+      const data = JSON.parse(raw);
+      applyTopology(data);
+      state.lastSavedAt = data.savedAt || null;
+      state.dirty = false;
+      updateSaveStatus();
+      return true;
+    } catch (e) {
+      console.error(e);
+      return false;
+    }
+  }
+
+  function exportTopology() {
+    const data = serializeTopology();
+    const blob = new Blob([JSON.stringify(data, null, 2)], { type: 'application/json' });
+    const a = document.createElement('a');
+    a.href = URL.createObjectURL(blob);
+    a.download = `topologia-rede-${new Date().toISOString().slice(0, 10)}.json`;
+    a.click();
+    URL.revokeObjectURL(a.href);
+    log('Arquivo de topologia exportado.', 'action');
+  }
+
+  function importTopology(file) {
+    const reader = new FileReader();
+    reader.onload = () => {
+      try {
+        const data = JSON.parse(reader.result);
+        applyTopology(data);
+        saveTopology(true);
+        log('Topologia importada e salva com sucesso.', 'ok');
+      } catch (e) {
+        log('Falha ao importar: ' + e.message, 'err');
+      }
+    };
+    reader.readAsText(file);
+  }
+
+  // ========== DISPOSITIVOS ==========
+  function createDevice(type) {
+    const id = 'dev' + state.nextId++;
+    const count = state.devices.filter(d => d.type === type).length + 1;
+    const labels = { host: 'Host', switch: 'SW', router: 'R', dhcp: 'DHCP' };
+    const device = {
+      id,
+      type,
+      x: 80 + Math.random() * 500,
+      y: 60 + Math.random() * 350,
+      label: labels[type] + count,
+      ip: (type === 'host' || type === 'dhcp') ? '' : undefined,
+      mask: (type === 'host' || type === 'dhcp') ? '255.255.255.0' : undefined,
+      gateway: type === 'host' ? '' : undefined,
+      dns: type === 'host' ? '' : undefined,
+      ipMode: type === 'host' ? 'static' : undefined,
+      dhcpLease: type === 'host' ? null : undefined,
+      dhcp: type === 'dhcp' ? defaultDhcpConfig() : null,
+      interfaces: type === 'router' ? [
+        { name: 'Gi0/0', ip: '', mask: '255.255.255.0', linkId: null },
+        { name: 'Gi0/1', ip: '', mask: '255.255.255.0', linkId: null },
+        { name: 'Gi0/2', ip: '', mask: '255.255.255.0', linkId: null },
+        { name: 'Gi0/3', ip: '', mask: '255.255.255.0', linkId: null }
+      ] : null
+    };
+    state.devices.push(device);
+    renderDevice(device);
+    selectDevice(id);
+    log(`Dispositivo ${device.label} adicionado.`, 'action');
+    if (type === 'dhcp') {
+      log('Configure o IP do servidor e o escopo DHCP (range, máscara, gateway, DNS e lease).', 'info');
+    }
+    markDirty();
+    if (state.mode === 'connect') updateConnectUI();
+  }
+
+  function renderDevice(dev) {
+    const el = document.createElement('div');
+    el.className = `device ${dev.type}`;
+    el.id = dev.id;
+    el.style.left = dev.x + 'px';
+    el.style.top = dev.y + 'px';
+    const iconHtml = {
+      host: '🖥️',
+      dhcp: '📦',
+      switch: '<img src="imgs/network-switch.png" alt="Switch" draggable="false">',
+      router: '<img src="imgs/roteador.png" alt="Roteador" draggable="false">'
+    };
+    el.innerHTML = `
+      <div class="device-icon">${iconHtml[dev.type]}</div>
+      <div class="device-label">${dev.label}</div>
+      <div class="device-ip" id="ip-${dev.id}"></div>
+    `;
+    el.addEventListener('mousedown', e => {
+      if (e.button !== 0) return;
+      e.stopPropagation();
+      startDrag(e, dev);
+    });
+    el.addEventListener('click', e => {
+      e.stopPropagation();
+      if (state.mode === 'connect') handleConnectClick(dev);
+      else if (!(e.ctrlKey || e.metaKey || e.shiftKey)) {
+        // seleção já tratada no mousedown/drag; clique simples garante foco nas props
+        if (state.selectedIds.length <= 1) selectDevice(dev.id);
+      }
+    });
+    document.getElementById('world').appendChild(el);
+    updateDeviceIpLabel(dev);
+  }
+
+  function updateDeviceIpLabel(dev) {
+    const el = document.getElementById('ip-' + dev.id);
+    if (!el) return;
+    if (dev.type === 'host' && dev.ip) {
+      el.textContent = (dev.ipMode === 'dhcp' ? 'DHCP · ' : '') + dev.ip;
+    } else if (dev.type === 'host' && dev.ipMode === 'dhcp') {
+      el.textContent = 'DHCP (sem IP)';
+    } else if (dev.type === 'dhcp') {
+      const cfg = ensureDhcpConfig(dev);
+      if (dev.ip) {
+        el.textContent = `${dev.ip}${cfg.enabled ? '' : ' (off)'}`;
+      } else {
+        el.textContent = cfg.enabled ? 'sem IP' : 'off';
+      }
+    } else if (dev.type === 'router') {
+      const configured = dev.interfaces.filter(i => i.ip).map(i => i.ip);
+      el.textContent = configured.length ? configured.join(' | ') : '';
+    } else {
+      el.textContent = '';
+    }
+  }
+
+  function updateDevicePosition(dev) {
+    const el = document.getElementById(dev.id);
+    if (el) {
+      el.style.left = dev.x + 'px';
+      el.style.top = dev.y + 'px';
+    }
+    updateLinks();
+  }
+
+  // ========== LINKS ==========
+  function updateLinks() {
+    const svg = document.getElementById('connections');
+    svg.innerHTML = '';
+    state.links.forEach(link => {
+      const d1 = state.devices.find(d => d.id === link.from);
+      const d2 = state.devices.find(d => d.id === link.to);
+      if (!d1 || !d2) return;
+      const line = document.createElementNS('http://www.w3.org/2000/svg', 'line');
+      line.setAttribute('x1', d1.x + 45);
+      line.setAttribute('y1', d1.y + 32);
+      line.setAttribute('x2', d2.x + 45);
+      line.setAttribute('y2', d2.y + 32);
+      line.setAttribute('stroke', state.mode === 'connect' ? '#10b981' : '#94a3b8');
+      line.setAttribute('stroke-width', state.mode === 'connect' ? '3.5' : '3');
+      line.setAttribute('stroke-linecap', 'round');
+      svg.appendChild(line);
+    });
+  }
+
+  function createLink(d1, d2) {
+    const cable = canConnect(d1, d2);
+    if (!cable.ok) {
+      log(cable.msg, 'err');
+      return;
+    }
+
+    if (state.links.some(l =>
+      (l.from === d1.id && l.to === d2.id) || (l.from === d2.id && l.to === d1.id))) {
+      log('Já existe conexão entre esses dispositivos.', 'err');
+      return;
+    }
+
+    // Prever loop de switches
+    if (d1.type === 'switch' && d2.type === 'switch') {
+      // se já existe caminho entre eles só por switches, criar link = loop
+      const swAdj = buildAdj((a, b) => a.type === 'switch' && b.type === 'switch');
+      if (findPath(d1.id, d2.id, swAdj)) {
+        log('Loop detectado entre switches. Ligação bloqueada (sem STP).', 'err');
+        return;
+      }
+    }
+
+    let iface1 = null, iface2 = null;
+    if (d1.type === 'router') {
+      iface1 = d1.interfaces.find(i => !i.linkId);
+      if (!iface1) {
+        log(`${d1.label} não possui interfaces livres.`, 'err');
+        return;
+      }
+    }
+    if (d2.type === 'router') {
+      iface2 = d2.interfaces.find(i => !i.linkId);
+      if (!iface2) {
+        log(`${d2.label} não possui interfaces livres.`, 'err');
+        return;
+      }
+    }
+    const linkId = 'link' + state.nextId++;
+    state.links.push({ id: linkId, from: d1.id, to: d2.id });
+    if (iface1) iface1.linkId = linkId;
+    if (iface2) iface2.linkId = linkId;
+    updateLinks();
+    log(`Cabo conectado: ${d1.label} ↔ ${d2.label}`, 'ok');
+    if (state.selectedId === d1.id || state.selectedId === d2.id) renderProperties();
+    markDirty();
+  }
+
+  // ========== VIEW (ZOOM / PAN) ==========
+  function applyViewTransform() {
+    const world = document.getElementById('world');
+    if (!world) return;
+    const { zoom, panX, panY } = state.view;
+    world.style.transform = `translate(${panX}px, ${panY}px) scale(${zoom})`;
+    const label = document.getElementById('zoom-label');
+    if (label) label.textContent = Math.round(zoom * 100) + '%';
+    // grade do canvas acompanha o zoom visualmente
+    const canvas = document.getElementById('canvas');
+    if (canvas) {
+      const size = Math.max(8, 24 * zoom);
+      const offsetX = ((panX % size) + size) % size;
+      const offsetY = ((panY % size) + size) % size;
+      canvas.style.backgroundSize = `${size}px ${size}px`;
+      canvas.style.backgroundPosition = `${offsetX}px ${offsetY}px`;
+    }
+  }
+
+  function screenToWorld(clientX, clientY) {
+    const canvas = document.getElementById('canvas');
+    const rect = canvas.getBoundingClientRect();
+    const { zoom, panX, panY } = state.view;
+    return {
+      x: (clientX - rect.left - panX) / zoom,
+      y: (clientY - rect.top - panY) / zoom
+    };
+  }
+
+  function setZoom(newZoom, pivotClientX, pivotClientY) {
+    const canvas = document.getElementById('canvas');
+    const rect = canvas.getBoundingClientRect();
+    const z0 = state.view.zoom;
+    const z1 = Math.max(VIEW_ZOOM_MIN, Math.min(VIEW_ZOOM_MAX, newZoom));
+    if (Math.abs(z1 - z0) < 0.0001) return;
+
+    const cx = pivotClientX != null ? pivotClientX : rect.left + rect.width / 2;
+    const cy = pivotClientY != null ? pivotClientY : rect.top + rect.height / 2;
+    const wx = (cx - rect.left - state.view.panX) / z0;
+    const wy = (cy - rect.top - state.view.panY) / z0;
+    state.view.zoom = z1;
+    state.view.panX = cx - rect.left - wx * z1;
+    state.view.panY = cy - rect.top - wy * z1;
+    applyViewTransform();
+  }
+
+  function zoomBy(delta, pivotClientX, pivotClientY) {
+    setZoom(state.view.zoom + delta, pivotClientX, pivotClientY);
+  }
+
+  function resetView() {
+    state.view.zoom = 1;
+    state.view.panX = 0;
+    state.view.panY = 0;
+    applyViewTransform();
+  }
+
+  // ========== DRAG (dispositivos / pan) ==========
+  function startDrag(e, dev) {
+    if (state.mode === 'connect') return;
+
+    const multiKey = e.ctrlKey || e.metaKey || e.shiftKey;
+    if (multiKey) {
+      toggleSelection(dev.id, true);
+    } else if (!state.selectedIds.includes(dev.id)) {
+      selectDevice(dev.id);
+    } else {
+      // já está no grupo: mantém multi-seleção e foca props no clicado
+      state.selectedId = dev.id;
+      updateSelectionUI();
+      renderProperties();
+    }
+
+    const world = screenToWorld(e.clientX, e.clientY);
+    const ids = state.selectedIds.includes(dev.id) ? [...state.selectedIds] : [dev.id];
+    const startPositions = {};
+    ids.forEach(id => {
+      const d = getDevice(id);
+      if (d) startPositions[id] = { x: d.x, y: d.y };
+    });
+
+    state.dragging = {
+      type: 'devices',
+      ids,
+      startPositions,
+      startMouse: world,
+      moved: false
+    };
+    document.addEventListener('mousemove', onDrag);
+    document.addEventListener('mouseup', endDrag);
+  }
+
+  function startPan(e) {
+    if (state.mode === 'connect') return;
+    state.dragging = {
+      type: 'pan',
+      startClient: { x: e.clientX, y: e.clientY },
+      startPan: { x: state.view.panX, y: state.view.panY }
+    };
+    document.getElementById('canvas')?.classList.add('panning');
+    document.addEventListener('mousemove', onDrag);
+    document.addEventListener('mouseup', endDrag);
+  }
+
+  function onDrag(e) {
+    if (!state.dragging) return;
+    if (state.dragging.type === 'pan') {
+      const dx = e.clientX - state.dragging.startClient.x;
+      const dy = e.clientY - state.dragging.startClient.y;
+      state.view.panX = state.dragging.startPan.x + dx;
+      state.view.panY = state.dragging.startPan.y + dy;
+      applyViewTransform();
+      return;
+    }
+    if (state.dragging.type === 'devices') {
+      const world = screenToWorld(e.clientX, e.clientY);
+      const dx = world.x - state.dragging.startMouse.x;
+      const dy = world.y - state.dragging.startMouse.y;
+      if (Math.abs(dx) > 0.5 || Math.abs(dy) > 0.5) state.dragging.moved = true;
+      state.dragging.ids.forEach(id => {
+        const d = getDevice(id);
+        const start = state.dragging.startPositions[id];
+        if (!d || !start) return;
+        d.x = start.x + dx;
+        d.y = start.y + dy;
+        updateDevicePosition(d);
+      });
+    }
+  }
+
+  function endDrag() {
+    const was = state.dragging;
+    if (was?.type === 'devices' && was.moved) markDirty();
+    if (was?.type === 'pan') {
+      document.getElementById('canvas')?.classList.remove('panning');
+    }
+    state.dragging = null;
+    document.removeEventListener('mousemove', onDrag);
+    document.removeEventListener('mouseup', endDrag);
+  }
+
+  // ========== SELEÇÃO E PROPRIEDADES ==========
+  function updateSelectionUI() {
+    document.querySelectorAll('.device').forEach(el => {
+      el.classList.remove('selected', 'multi');
+    });
+    const multi = state.selectedIds.length > 1;
+    state.selectedIds.forEach(id => {
+      const el = document.getElementById(id);
+      if (!el) return;
+      el.classList.add('selected');
+      if (multi) el.classList.add('multi');
+    });
+  }
+
+  function selectDevice(id) {
+    state.selectedId = id;
+    state.selectedIds = id ? [id] : [];
+    updateSelectionUI();
+    renderProperties();
+  }
+
+  function selectAllDevices() {
+    if (state.mode === 'connect') {
+      log('Saia do modo conectar para selecionar dispositivos.', 'warn');
+      return;
+    }
+    if (!state.devices.length) {
+      log('Não há dispositivos para selecionar.', 'info');
+      return;
+    }
+    state.selectedIds = state.devices.map(d => d.id);
+    state.selectedId = state.selectedIds[0] || null;
+    updateSelectionUI();
+    renderProperties();
+    log(`${state.selectedIds.length} dispositivo(s) selecionado(s). Arraste um deles para mover o grupo.`, 'action');
+  }
+
+  function toggleSelection(id, keepOthers) {
+    const set = new Set(keepOthers ? state.selectedIds : []);
+    if (set.has(id)) set.delete(id);
+    else set.add(id);
+    state.selectedIds = [...set];
+    state.selectedId = state.selectedIds.includes(id)
+      ? id
+      : (state.selectedIds[state.selectedIds.length - 1] || null);
+    updateSelectionUI();
+    renderProperties();
+  }
+
+  function deleteSelectedDevices() {
+    const ids = state.selectedIds.length
+      ? [...state.selectedIds]
+      : (state.selectedId ? [state.selectedId] : []);
+    if (!ids.length) {
+      log('Nenhum dispositivo selecionado.', 'err');
+      return;
+    }
+    const labels = ids.map(id => getDevice(id)?.label || id);
+    const idSet = new Set(ids);
+    state.links = state.links.filter(l => {
+      if (idSet.has(l.from) || idSet.has(l.to)) {
+        state.devices.forEach(d => {
+          if (d.interfaces) {
+            d.interfaces.forEach(i => {
+              if (i.linkId === l.id) i.linkId = null;
+            });
+          }
+        });
+        return false;
+      }
+      return true;
+    });
+    // limpa leases DHCP ligadas aos dispositivos removidos
+    state.devices.forEach(d => {
+      if (d.type !== 'dhcp' || !d.dhcp?.leases) return;
+      Object.keys(d.dhcp.leases).forEach(ip => {
+        if (idSet.has(d.dhcp.leases[ip].hostId) || idSet.has(d.id)) {
+          // se o servidor ou o host saem, remove a lease
+          if (idSet.has(d.dhcp.leases[ip].hostId)) delete d.dhcp.leases[ip];
+        }
+      });
+    });
+    ids.forEach(id => {
+      const removed = getDevice(id);
+      if (removed?.type === 'host' && removed.dhcpLease) {
+        // host removido: lease já limpa acima se servidor permanece
+      }
+      if (removed?.type === 'dhcp') {
+        // hosts que usavam este servidor perdem a lease
+        state.devices.forEach(h => {
+          if (h.type === 'host' && h.dhcpLease?.serverId === id) {
+            h.ip = '';
+            h.gateway = '';
+            h.dns = '';
+            h.dhcpLease = null;
+            updateDeviceIpLabel(h);
+          }
+        });
+      }
+      document.getElementById(id)?.remove();
+    });
+    state.devices = state.devices.filter(d => !idSet.has(d.id));
+    selectDevice(null);
+    updateLinks();
+    log(`Removido(s): ${labels.join(', ')}`, 'action');
+    markDirty();
+    if (state.mode === 'connect') updateConnectUI();
+  }
+
+  function renderProperties() {
+    const panel = document.getElementById('properties');
+    if (state.selectedIds.length > 1) {
+      const names = state.selectedIds.map(id => getDevice(id)?.label || id).join(', ');
+      panel.innerHTML = `
+        <h3>${state.selectedIds.length} dispositivos selecionados</h3>
+        <p style="color:#64748b;font-size:0.85rem;margin-top:6px;">${names}</p>
+        <p class="hint">Arraste qualquer um para mover o grupo. Clique em um só (sem Ctrl) para editar. Use Excluir para remover todos os selecionados.</p>
+        <p class="hint">Dica: <strong>Ctrl+A</strong> seleciona tudo · scroll no quadro dá zoom · arraste o fundo para mover a visão.</p>`;
+      return;
+    }
+    const dev = state.devices.find(d => d.id === state.selectedId);
+    if (!dev) {
+      panel.innerHTML = `
+        <p style="color:#64748b;font-size:0.85rem;">Selecione um dispositivo para configurar endereçamento IP, máscara e gateway.</p>
+        <p class="hint">Validações: IP único, rede/broadcast, gateway, DHCP (escopo/range/lease), cabos e loops de switch.</p>
+        <p class="hint" style="margin-top:10px;color:#94a3b8;">🔌 <strong>Modo Conectar:</strong> ative na barra, clique em dois dispositivos. Host↔Host é bloqueado.</p>
+        <p class="hint" style="margin-top:8px;">📦 <strong>DHCP:</strong> + DHCP → configure pool → no host, modo DHCP → Obter IP. Use Validar e Simular Mensagem para testar.</p>
+        <p class="hint" style="margin-top:8px;">Zoom: scroll no quadro · Mover visão: arraste o fundo · Selecionar tudo: Ctrl+A</p>`;
+      return;
+    }
+    const typeLabel = { host: 'host', switch: 'switch', router: 'router', dhcp: 'servidor DHCP' }[dev.type] || dev.type;
+    let html = `<h3>${dev.label} <span style="color:#64748b;font-weight:400;font-size:0.8rem;">(${typeLabel})</span></h3>`;
+    html += `<label>Nome do dispositivo</label>
+             <input type="text" id="prop-label" value="${dev.label}">`;
+
+    if (dev.type === 'host') {
+      const mode = dev.ipMode === 'dhcp' ? 'dhcp' : 'static';
+      const ro = mode === 'dhcp' ? 'readonly' : '';
+      html += `
+        <label>Modo de endereçamento</label>
+        <div class="ip-mode-row">
+          <label class="radio"><input type="radio" name="ip-mode" value="static" ${mode === 'static' ? 'checked' : ''}> Estático</label>
+          <label class="radio"><input type="radio" name="ip-mode" value="dhcp" ${mode === 'dhcp' ? 'checked' : ''}> DHCP</label>
+        </div>
+        <label>Endereço IP</label>
+        <input type="text" id="prop-ip" value="${dev.ip || ''}" placeholder="192.168.1.10" ${ro}>
+        <label>Máscara de Subrede</label>
+        <input type="text" id="prop-mask" value="${dev.mask || '255.255.255.0'}" placeholder="255.255.255.0" ${ro}>
+        <label>Gateway Padrão</label>
+        <input type="text" id="prop-gw" value="${dev.gateway || ''}" placeholder="192.168.1.1" ${ro}>
+        <label>DNS</label>
+        <input type="text" id="prop-dns" value="${dev.dns || ''}" placeholder="8.8.8.8" ${ro}>`;
+
+      if (mode === 'dhcp') {
+        html += `<p class="hint">Em modo DHCP, o host obtém IP, máscara, gateway e DNS do servidor no mesmo segmento L2 (via switch).</p>`;
+        if (dev.dhcpLease && dev.ip) {
+          const leftMs = (dev.dhcpLease.expiresAt || 0) - Date.now();
+          const left = leftMs > 0 ? formatLease(Math.round(leftMs / 1000)) : 'expirado';
+          const g = leaseGrantedAt(dev.dhcpLease);
+          const total = (dev.dhcpLease.leaseSeconds || 1) * 1000;
+          const pct = g != null ? Math.max(0, Math.min(100, ((Date.now() - g) / total) * 100)) : 0;
+          const t1 = leaseT1At(dev.dhcpLease);
+          const untilT1 = t1 != null ? t1 - Date.now() : null;
+          const t1Text = dev.dhcpLease.renewInProgress
+            ? 'Renovando agora (T1)…'
+            : (untilT1 != null && untilT1 > 0
+              ? `Próxima renovação (T1) em ≈ ${formatLease(Math.ceil(untilT1 / 1000))}`
+              : 'T1 atingido / renovação em curso ou já pedida');
+          html += `<div class="dhcp-lease-box">
+            <strong>Lease ativo</strong><br>
+            Servidor: ${dev.dhcpLease.serverLabel || '?'} (${dev.dhcpLease.serverIp || '?'})<br>
+            Concessão: ${formatLease(dev.dhcpLease.leaseSeconds)} · restante ≈ ${left}<br>
+            <span id="dhcp-t1-info">${t1Text}</span>
+            <div class="dhcp-lease-bar ${pct >= 50 ? 't1' : ''}" id="dhcp-lease-progress"><span style="width:${pct}%"></span></div>
+            <span style="font-size:0.68rem;opacity:0.9">Barra: 50% = T1 (pedido de renovação automático com animação)</span>
+          </div>`;
+        }
+        html += `<div class="prop-actions">
+          <button type="button" id="btn-dhcp-request">📡 Obter / Renovar IP (DHCP)</button>
+          <button type="button" id="btn-dhcp-release" class="secondary">Liberar IP (Release)</button>
+        </div>`;
+      } else {
+        html += `<p class="hint">O gateway deve ser o IP de uma interface do roteador na mesma subrede deste host. Não use endereço de rede (.0) nem broadcast (.255).</p>`;
+      }
+      html += `<div id="prop-errors" class="prop-error"></div>`;
+    } else if (dev.type === 'dhcp') {
+      const cfg = ensureDhcpConfig(dev);
+      const activeLeases = Object.entries(cfg.leases || {}).filter(([, l]) => !l.expiresAt || l.expiresAt >= Date.now());
+      html += `
+        <h4>IP do servidor (estático)</h4>
+        <label>Endereço IP</label>
+        <input type="text" id="prop-ip" value="${dev.ip || ''}" placeholder="192.168.1.2">
+        <label>Máscara</label>
+        <input type="text" id="prop-mask" value="${dev.mask || cfg.mask || '255.255.255.0'}" placeholder="255.255.255.0">
+        <label style="margin-top:10px;display:flex;align-items:center;gap:6px;color:#334155;font-size:0.85rem;">
+          <input type="checkbox" id="prop-dhcp-enabled" ${cfg.enabled ? 'checked' : ''} style="width:auto;margin:0">
+          Serviço DHCP ativo
+        </label>
+        <h4>Escopo / Pool</h4>
+        <label>Início do range</label>
+        <input type="text" id="prop-pool-start" value="${cfg.poolStart || ''}" placeholder="192.168.1.100">
+        <label>Fim do range</label>
+        <input type="text" id="prop-pool-end" value="${cfg.poolEnd || ''}" placeholder="192.168.1.200">
+        <label>Máscara do escopo</label>
+        <input type="text" id="prop-pool-mask" value="${cfg.mask || '255.255.255.0'}" placeholder="255.255.255.0">
+        <label>Gateway (option 003)</label>
+        <input type="text" id="prop-pool-gw" value="${cfg.gateway || ''}" placeholder="192.168.1.1">
+        <label>DNS (option 006)</label>
+        <input type="text" id="prop-pool-dns" value="${cfg.dns || ''}" placeholder="8.8.8.8">
+        <label>Tempo de concessão (lease)</label>
+        <input type="text" id="prop-pool-lease" value="${cfg.lease || DEFAULT_LEASE_SEC}" placeholder="3600 ou 1h">
+        <p class="hint">Lease: segundos (ex: 3600) ou 30m / 1h / 1d. Mínimo ${MIN_LEASE_SEC}s. Na <strong>metade do tempo (T1)</strong> o host renova sozinho com animação REQUEST→ACK. Para ver na aula, use lease curto (ex: <strong>30</strong> ou <strong>40s</strong>).</p>
+        <h4>Leases ativas (${activeLeases.length})</h4>`;
+      if (!activeLeases.length) {
+        html += `<p class="hint">Nenhuma concessão. Nos hosts, ative o modo DHCP e clique em "Obter IP".</p>`;
+      } else {
+        html += `<div class="hint" style="color:#78350f">`;
+        activeLeases.forEach(([ip, l]) => {
+          const leftMs = (l.expiresAt || 0) - Date.now();
+          const left = leftMs > 0 ? formatLease(Math.round(leftMs / 1000)) : 'exp.';
+          html += `<div>• ${ip} → ${l.hostLabel || l.hostId} (resta ${left})</div>`;
+        });
+        html += `</div>`;
+      }
+      html += `<div class="prop-actions">
+        <button type="button" id="btn-dhcp-test" class="secondary">🧪 Testar: oferecer IP a um host DHCP do segmento</button>
+      </div>`;
+      html += `<div id="prop-errors" class="prop-error"></div>`;
+    } else if (dev.type === 'router') {
+      html += `<h4>Interfaces do Roteador</h4>`;
+      dev.interfaces.forEach((iface, i) => {
+        const status = iface.linkId ? 'conectada' : 'livre';
+        const statusCls = iface.linkId ? 'connected' : '';
+        html += `
+          <div class="iface-box">
+            <strong>${iface.name}</strong>
+            <span class="iface-status ${statusCls}"> — ${status}</span>
+            <label>IP</label>
+            <input type="text" class="iface-ip" data-idx="${i}" value="${iface.ip}" placeholder="192.168.1.1">
+            <label>Máscara</label>
+            <input type="text" class="iface-mask" data-idx="${i}" value="${iface.mask}" placeholder="255.255.255.0">
+          </div>`;
+      });
+      // tabela de rotas
+      const routes = buildRoutingTable(dev);
+      html += `<h4>Tabela de Rotas (simplificada)</h4>`;
+      if (!routes.length) {
+        html += `<p class="hint">Nenhuma rota. Configure IPs nas interfaces.</p>`;
+      } else {
+        html += `<div class="hint" style="color:#94a3b8">`;
+        routes.forEach(r => {
+          html += `<div>• ${r.key} — ${r.type}</div>`;
+        });
+        html += `</div>`;
+      }
+      html += `<div id="prop-errors" class="prop-error"></div>`;
+    } else {
+      html += `<p style="color:#94a3b8;font-size:0.85rem;margin-top:10px;">Switches operam na camada 2 e não precisam de endereço IP. Conectam dispositivos e aprendem MAC — não fazem roteamento.</p>`;
+      html += `<div id="prop-errors" class="prop-error"></div>`;
+    }
+
+    html += `<button id="btn-save-props" style="width:100%;margin-top:14px;">Salvar Configuração</button>`;
+    panel.innerHTML = html;
+    document.getElementById('btn-save-props').onclick = () => saveProperties(dev);
+
+    // Host: troca de modo estático/DHCP
+    panel.querySelectorAll('input[name="ip-mode"]').forEach(radio => {
+      radio.addEventListener('change', () => {
+        const newMode = panel.querySelector('input[name="ip-mode"]:checked')?.value || 'static';
+        if (newMode === 'dhcp') {
+          // libera IP manual — passa a depender do servidor DHCP
+          if (dev.ipMode !== 'dhcp') {
+            dev.ip = '';
+            dev.gateway = '';
+            dev.dns = '';
+            dev.dhcpLease = null;
+          }
+          dev.ipMode = 'dhcp';
+          log(`${dev.label}: modo DHCP. Conecte ao segmento e use "Obter / Renovar IP".`, 'info');
+        } else {
+          if (dev.ipMode === 'dhcp') {
+            releaseDhcpForHost(dev, { silent: true });
+          }
+          dev.ipMode = 'static';
+          dev.dhcpLease = null;
+          log(`${dev.label}: modo estático. Configure IP, máscara e gateway manualmente.`, 'info');
+        }
+        updateDeviceIpLabel(dev);
+        markDirty();
+        renderProperties();
+      });
+    });
+
+    const btnReq = document.getElementById('btn-dhcp-request');
+    if (btnReq) {
+      btnReq.onclick = () => {
+        const result = requestDhcpForHost(dev);
+        if (!result.ok) {
+          const errBox = document.getElementById('prop-errors');
+          if (errBox) errBox.innerHTML = `❌ ${result.msg}`;
+          log(result.msg, 'err');
+        }
+        renderProperties();
+        runValidation(false);
+      };
+    }
+    const btnRel = document.getElementById('btn-dhcp-release');
+    if (btnRel) {
+      btnRel.onclick = () => {
+        releaseDhcpForHost(dev);
+        renderProperties();
+        runValidation(false);
+      };
+    }
+    const btnTest = document.getElementById('btn-dhcp-test');
+    if (btnTest) {
+      btnTest.onclick = () => testDhcpServer(dev);
+    }
+  }
+
+  /** Oferece IP ao primeiro host em modo DHCP no mesmo segmento (para validar o escopo). */
+  function testDhcpServer(server) {
+    if (!server || server.type !== 'dhcp') return;
+    const scopeErrs = validateDhcpScope(server).filter(i => i.level === 'err');
+    if (scopeErrs.length) {
+      log(scopeErrs[0].msg, 'err');
+      const errBox = document.getElementById('prop-errors');
+      if (errBox) errBox.innerHTML = scopeErrs.map(i => `❌ ${i.msg}`).join('<br>');
+      return;
+    }
+    if (!isConnected(server.id)) {
+      log(`${server.label} precisa estar conectado (switch/roteador) para testar.`, 'err');
+      return;
+    }
+    const domain = getBroadcastDomainFrom(server.id);
+    const hosts = state.devices.filter(
+      h => h.type === 'host' && domain.has(h.id) && h.ipMode === 'dhcp'
+    );
+    if (!hosts.length) {
+      log('Nenhum host em modo DHCP no mesmo segmento. Adicione um host, ligue ao switch, marque DHCP e tente de novo.', 'warn');
+      return;
+    }
+    // prefere host sem IP
+    const target = hosts.find(h => !h.ip) || hosts[0];
+    log(`Teste DHCP: solicitando endereço para ${target.label}…`, 'action');
+    const result = requestDhcpForHost(target);
+    if (!result.ok) log(result.msg, 'err');
+    if (state.selectedId === server.id || state.selectedId === target.id) renderProperties();
+    runValidation(false);
+  }
+
+  function saveProperties(dev) {
+    const errBox = document.getElementById('prop-errors');
+    const localErrors = [];
+
+    const newLabel = document.getElementById('prop-label').value.trim();
+    if (newLabel) {
+      dev.label = newLabel;
+      const labelEl = document.querySelector(`#${dev.id} .device-label`);
+      if (labelEl) labelEl.textContent = newLabel;
+    }
+
+    if (dev.type === 'host') {
+      const mode = document.querySelector('input[name="ip-mode"]:checked')?.value || dev.ipMode || 'static';
+
+      if (mode === 'dhcp') {
+        dev.ipMode = 'dhcp';
+        // IP/máscara/gw/dns vêm do DHCP — não sobrescreve se já tiver lease
+        if (!dev.ip) {
+          log(`${dev.label} em modo DHCP. Use "Obter / Renovar IP" após conectar ao segmento com servidor DHCP.`, 'info');
+        }
+      } else {
+        // se saiu do DHCP, libera lease
+        if (dev.ipMode === 'dhcp') {
+          releaseDhcpForHost(dev, { silent: true });
+        }
+        dev.ipMode = 'static';
+        const ip = document.getElementById('prop-ip').value.trim();
+        const mask = document.getElementById('prop-mask').value.trim() || '255.255.255.0';
+        const gw = document.getElementById('prop-gw').value.trim();
+        const dns = document.getElementById('prop-dns')?.value.trim() || '';
+
+        validateIpAssignment(ip, mask, dev.label).forEach(i => localErrors.push(i.msg));
+
+        if (ip && gw) {
+          const hNet = getNetworkAddr(ip, mask);
+          const gNet = getNetworkAddr(gw, mask);
+          if (hNet === null || gNet === null || hNet !== gNet) {
+            localErrors.push('Gateway fora da rede do host.');
+          }
+        }
+
+        if (dns && ipToNumber(dns) === null) {
+          localErrors.push('DNS inválido.');
+        }
+
+        // conflito de IP
+        if (ip) {
+          const conflict = collectIpEndpoints().find(ep =>
+            ep.ip === ip && ep.deviceId !== dev.id
+          );
+          if (conflict) {
+            localErrors.push(`Conflito de IP: o endereço ${ip} já está sendo utilizado por ${conflict.label}.`);
+          }
+        }
+
+        if (localErrors.length) {
+          if (errBox) errBox.innerHTML = localErrors.map(m => `❌ ${m}`).join('<br>');
+          localErrors.forEach(m => log(m, 'err'));
+          return;
+        }
+
+        dev.ip = ip;
+        dev.mask = mask;
+        dev.gateway = gw;
+        dev.dns = dns;
+        dev.dhcpLease = null;
+      }
+    } else if (dev.type === 'dhcp') {
+      const ip = document.getElementById('prop-ip').value.trim();
+      const mask = document.getElementById('prop-mask').value.trim() || '255.255.255.0';
+      const enabled = !!document.getElementById('prop-dhcp-enabled')?.checked;
+      const poolStart = document.getElementById('prop-pool-start').value.trim();
+      const poolEnd = document.getElementById('prop-pool-end').value.trim();
+      const poolMask = document.getElementById('prop-pool-mask').value.trim() || mask;
+      const poolGw = document.getElementById('prop-pool-gw').value.trim();
+      const poolDns = document.getElementById('prop-pool-dns').value.trim();
+      const leaseRaw = document.getElementById('prop-pool-lease').value.trim();
+      const lease = parseLeaseInput(leaseRaw);
+
+      if (lease === null) {
+        localErrors.push('Lease inválido. Use segundos (3600) ou 30m / 1h / 1d.');
+      }
+
+      const draft = {
+        ...ensureDhcpConfig(dev),
+        enabled,
+        poolStart,
+        poolEnd,
+        mask: poolMask,
+        gateway: poolGw,
+        dns: poolDns,
+        lease: lease || DEFAULT_LEASE_SEC
+      };
+
+      // valida com rascunho temporário
+      const prevIp = dev.ip;
+      const prevMask = dev.mask;
+      const prevDhcp = dev.dhcp;
+      dev.ip = ip;
+      dev.mask = mask;
+      dev.dhcp = draft;
+      validateDhcpScope(dev).forEach(i => {
+        if (i.level === 'err') localErrors.push(i.msg);
+      });
+
+      if (ip) {
+        const conflict = collectIpEndpoints().find(ep =>
+          ep.ip === ip && ep.deviceId !== dev.id
+        );
+        // collect still has old — check others
+        const other = state.devices.find(d => {
+          if (d.id === dev.id) return false;
+          if ((d.type === 'host' || d.type === 'dhcp') && d.ip === ip) return true;
+          if (d.type === 'router') return d.interfaces?.some(x => x.ip === ip);
+          return false;
+        });
+        if (other) {
+          localErrors.push(`Conflito de IP: o endereço ${ip} já está sendo utilizado por ${other.label}.`);
+        }
+      }
+
+      if (localErrors.length) {
+        dev.ip = prevIp;
+        dev.mask = prevMask;
+        dev.dhcp = prevDhcp;
+        if (errBox) errBox.innerHTML = localErrors.map(m => `❌ ${m}`).join('<br>');
+        localErrors.forEach(m => log(m, 'err'));
+        return;
+      }
+
+      dev.ip = ip;
+      dev.mask = mask;
+      dev.dhcp = draft;
+      // se máscara do servidor vazia, alinha com escopo
+      if (!dev.mask) dev.mask = poolMask;
+    } else if (dev.type === 'router') {
+      const draft = dev.interfaces.map((iface, i) => {
+        const ipEl = document.querySelector(`.iface-ip[data-idx="${i}"]`);
+        const maskEl = document.querySelector(`.iface-mask[data-idx="${i}"]`);
+        return {
+          ...iface,
+          ip: ipEl ? ipEl.value.trim() : iface.ip,
+          mask: maskEl ? (maskEl.value.trim() || '255.255.255.0') : iface.mask
+        };
+      });
+
+      draft.forEach(iface => {
+        if (!iface.ip) return;
+        validateIpAssignment(iface.ip, iface.mask, `${dev.label} ${iface.name}`).forEach(i => {
+          localErrors.push(i.msg);
+        });
+      });
+
+      // redes distintas entre interfaces
+      for (let i = 0; i < draft.length; i++) {
+        for (let j = i + 1; j < draft.length; j++) {
+          const a = draft[i], b = draft[j];
+          if (!a.ip || !b.ip) continue;
+          const same =
+            getNetworkAddr(a.ip, a.mask) === getNetworkAddr(b.ip, a.mask) ||
+            getNetworkAddr(a.ip, b.mask) === getNetworkAddr(b.ip, b.mask);
+          if (same) {
+            localErrors.push(`As interfaces ${a.name} e ${b.name} pertencem à mesma rede.`);
+          }
+        }
+      }
+
+      // conflito com outros dispositivos
+      draft.forEach(iface => {
+        if (!iface.ip) return;
+        const other = state.devices.find(d => {
+          if (d.id === dev.id) return false;
+          if ((d.type === 'host' || d.type === 'dhcp') && d.ip === iface.ip) return true;
+          if (d.type === 'router') return d.interfaces.some(x => x.ip === iface.ip);
+          return false;
+        });
+        if (other) {
+          localErrors.push(`Conflito de IP: o endereço ${iface.ip} já está sendo utilizado por ${other.label}.`);
+        }
+      });
+
+      if (localErrors.length) {
+        if (errBox) errBox.innerHTML = localErrors.map(m => `❌ ${m}`).join('<br>');
+        localErrors.forEach(m => log(m, 'err'));
+        return;
+      }
+
+      draft.forEach((iface, i) => {
+        dev.interfaces[i].ip = iface.ip;
+        dev.interfaces[i].mask = iface.mask;
+      });
+    }
+
+    updateDeviceIpLabel(dev);
+    log(`Configuração de ${dev.label} salva.`, 'ok');
+    markDirty();
+    renderProperties();
+    if (state.mode === 'connect') updateConnectUI();
+  }
+
+  // ========== MODO CONECTAR ==========
+  function handleConnectClick(dev) {
+    if (!state.connectFrom) {
+      state.connectFrom = dev;
+      log(`Ponto de origem da ligação: ${dev.label}. Clique no destino.`, 'info');
+    } else if (state.connectFrom.id === dev.id) {
+      state.connectFrom = null;
+      log('Seleção do cabo cancelada. Escolha outro primeiro dispositivo.', 'info');
+    } else {
+      createLink(state.connectFrom, dev);
+      state.connectFrom = null;
+    }
+    updateConnectUI();
+  }
+
+  // ========== SIMULAÇÃO (FLUXO COMPLETO) ==========
+  function openSimulateModal() {
+    const hosts = state.devices.filter(d => d.type === 'host');
+    if (hosts.length < 2) {
+      alert('É necessário ter pelo menos 2 hosts na topologia.');
+      return;
+    }
+    const srcSel = document.getElementById('sim-src');
+    const dstSel = document.getElementById('sim-dst');
+    srcSel.innerHTML = '';
+    dstSel.innerHTML = '';
+    hosts.forEach(h => {
+      const opt = `<option value="${h.id}">${h.label}${h.ip ? ' — ' + h.ip : ' (sem IP)'}</option>`;
+      srcSel.innerHTML += opt;
+      dstSel.innerHTML += opt;
+    });
+    if (hosts.length > 1) dstSel.selectedIndex = 1;
+    document.getElementById('modal').classList.add('show');
+  }
+
+  function closeModal() {
+    document.getElementById('modal').classList.remove('show');
+  }
+
+  function failSim(msg) {
+    log(`❌ ${msg}`, 'err');
+    log('A mensagem NÃO chegou ao destino. Simulação interrompida.', 'err');
+  }
+
+  function simulateSend() {
+    const srcId = document.getElementById('sim-src').value;
+    const dstId = document.getElementById('sim-dst').value;
+    const msg = document.getElementById('sim-msg').value.trim() || 'Olá!';
+
+    if (srcId === dstId) {
+      failSim('Origem e destino são o mesmo host.');
+      return;
+    }
+
+    const src = getDevice(srcId);
+    const dst = getDevice(dstId);
+    closeModal();
+
+    log('——— Iniciando envio de pacote ———', 'action');
+    log(`De ${src.label} para ${dst.label}: "${msg}"`, 'info');
+
+    // 1. Origem possui IP?
+    log('① Origem possui IP?', 'info');
+    if (!src.ip) {
+      if (src.ipMode === 'dhcp') {
+        failSim(`${src.label} está em modo DHCP, mas ainda não obteve IP. Selecione o host e use "Obter / Renovar IP (DHCP)".`);
+      } else {
+        failSim(`${src.label} não possui endereço IP configurado.`);
+      }
+      return;
+    }
+    log(`   ✓ ${src.label} → ${src.ip}${src.ipMode === 'dhcp' ? ' (DHCP)' : ''}`, 'ok');
+
+    // 2. Destino possui IP?
+    log('② Destino possui IP?', 'info');
+    if (!dst.ip) {
+      if (dst.ipMode === 'dhcp') {
+        failSim(`${dst.label} está em modo DHCP, mas ainda não obteve IP. Selecione o host e use "Obter / Renovar IP (DHCP)".`);
+      } else {
+        failSim(`${dst.label} não possui endereço IP configurado.`);
+      }
+      return;
+    }
+    log(`   ✓ ${dst.label} → ${dst.ip}${dst.ipMode === 'dhcp' ? ' (DHCP)' : ''}`, 'ok');
+
+    // 3. Conflito de IP?
+    log('③ Existe conflito de IP?', 'info');
+    const allEps = collectIpEndpoints();
+    const srcConflicts = allEps.filter(e => e.ip === src.ip && e.deviceId !== src.id);
+    const dstConflicts = allEps.filter(e => e.ip === dst.ip && e.deviceId !== dst.id);
+    if (srcConflicts.length) {
+      failSim(`Conflito de IP: o endereço ${src.ip} já está sendo utilizado por ${srcConflicts[0].label}.`);
+      return;
+    }
+    if (dstConflicts.length) {
+      failSim(`Conflito de IP: o endereço ${dst.ip} já está sendo utilizado por ${dstConflicts[0].label}.`);
+      return;
+    }
+    // rede/broadcast
+    const srcIpIssues = validateIpAssignment(src.ip, src.mask || '255.255.255.0', src.label);
+    const dstIpIssues = validateIpAssignment(dst.ip, dst.mask || '255.255.255.0', dst.label);
+    if (srcIpIssues.length) { failSim(srcIpIssues[0].msg); return; }
+    if (dstIpIssues.length) { failSim(dstIpIssues[0].msg); return; }
+    log('   ✓ Sem conflito de IP.', 'ok');
+
+    // 4. Mesmo segmento de rede?
+    log('④ Origem e destino estão na mesma rede?', 'info');
+    const sameNet = isSameNetwork(
+      { ip: src.ip, mask: src.mask || '255.255.255.0' },
+      { ip: dst.ip, mask: dst.mask || '255.255.255.0' }
+    );
+
+    // 8. Conexão física
+    log('⑧ Existe conexão física?', 'info');
+    const physicalPath = findPath(srcId, dstId);
+    if (!physicalPath) {
+      failSim(`Não existe caminho físico (cabos) entre ${src.label} e ${dst.label}.`);
+      return;
+    }
+    log('   ✓ Caminho: ' + physicalPath.map(id => getDevice(id)?.label).join(' → '), 'ok');
+
+    // 9. Destino "ligado" (conectado)
+    log('⑨ O destino está ligado à topologia?', 'info');
+    if (!isConnected(dst.id)) {
+      failSim(`O ${dst.label} não está conectado à rede.`);
+      return;
+    }
+    log('   ✓ Destino conectado.', 'ok');
+
+    if (sameNet) {
+      log('   ✓ Mesma subrede → comunicação direta (ARP).', 'ok');
+      // máscaras diferentes na LAN?
+      if (ipToNumber(src.mask || '255.255.255.0') !== ipToNumber(dst.mask || '255.255.255.0')) {
+        failSim('Os dispositivos da mesma LAN possuem máscaras diferentes.');
+        return;
+      }
+      // caminho L2 não deve precisar de roteador; se path só tem switches/hosts ok
+      log('⑤–⑦ Gateway/rota: não necessário (mesma rede).', 'info');
+      log('   ARP: resolvendo MAC de ' + dst.ip + '…', 'info');
+      log(`✅ Entrega direta via switches. Enviando…`, 'ok');
+      animatePduTransfer(physicalPath, msg, src, dst);
+      return;
+    }
+
+    // Redes diferentes
+    log('   ✗ Redes diferentes — é necessário gateway e roteamento.', 'warn');
+
+    // 5. Existe gateway?
+    log('⑤ Existe gateway no host de origem?', 'info');
+    if (!src.gateway) {
+      failSim('Sub-redes diferentes e o host de origem não tem Gateway configurado.');
+      return;
+    }
+    log(`   ✓ Gateway configurado: ${src.gateway}`, 'ok');
+
+    // Gateway na mesma rede do host
+    const srcMask = src.mask || '255.255.255.0';
+    if (getNetworkAddr(src.ip, srcMask) !== getNetworkAddr(src.gateway, srcMask)) {
+      failSim('Gateway fora da rede do host.');
+      return;
+    }
+
+    // 6. Gateway acessível?
+    log('⑥ O gateway está acessível?', 'info');
+    const gwRouter = findRouterByIp(src.gateway);
+    if (!gwRouter) {
+      failSim(`Gateway ${src.gateway} não corresponde a nenhum IP de interface de roteador.`);
+      return;
+    }
+    const gwIface = getRouterIfaceByIp(gwRouter, src.gateway);
+    // caminho físico até o gateway
+    const pathToGw = findPath(srcId, gwRouter.id);
+    if (!pathToGw) {
+      failSim(`Gateway ${src.gateway} (${gwRouter.label}) inacessível — sem caminho físico.`);
+      return;
+    }
+    // no path até o gateway não pode haver outro roteador "no meio" como se fosse L2...
+    // na prática ok se houver path
+    log(`   ✓ Gateway alcançável em ${gwRouter.label} (${gwIface?.name || '?'}).`, 'ok');
+
+    // 8b. Há roteador no caminho? (regra 8 switches only)
+    const pathOnlyL2 = physicalPath.every(id => {
+      const d = getDevice(id);
+      return d && (d.type === 'host' || d.type === 'switch' || d.id === srcId || d.id === dstId);
+    });
+    // se redes diferentes e path não inclui nenhum router
+    const routersInPath = physicalPath
+      .map(id => getDevice(id))
+      .filter(d => d && d.type === 'router');
+    if (!routersInPath.length) {
+      failSim('Não existe um roteador para encaminhar o pacote para outra rede.');
+      return;
+    }
+
+    // 7. Existe rota?
+    log('⑦ Existe rota para a rede de destino?', 'info');
+    const destMask = dst.mask || '255.255.255.0';
+    const destNet = getNetworkAddr(dst.ip, destMask);
+    const destKey = netKey(dst.ip, destMask);
+    const routeCheck = routerHasRouteTo(gwRouter, dst.ip, destMask);
+
+    if (!routeCheck.ok) {
+      failSim(`Destino inalcançável. O roteador ${gwRouter.label} não possui rota para a rede ${destKey || numberToIp(destNet) + '/' + maskToPrefix(destMask)}.`);
+      return;
+    }
+    log(`   ✓ Rota em ${gwRouter.label}: ${routeCheck.route.key} (${routeCheck.route.type})`, 'ok');
+
+    // Verifica se cada roteador no caminho lógico tem rota (tabela)
+    // Caminho de roteamento: BFS de roteadores do gw até um com rede do destino
+    const routerPath = findRouterPathToNetwork(gwRouter, dst.ip, destMask);
+    if (!routerPath) {
+      failSim(`Destino inalcançável. Não há cadeia de roteadores com rota até ${destKey}.`);
+      return;
+    }
+
+    for (const rid of routerPath) {
+      const r = getDevice(rid);
+      const rc = routerHasRouteTo(r, dst.ip, destMask);
+      if (!rc.ok) {
+        failSim(`O roteador ${r.label} não possui rota para a rede ${destKey}.`);
+        return;
+      }
+    }
+    log('   ✓ Cadeia de roteadores: ' + routerPath.map(id => getDevice(id)?.label).join(' → '), 'ok');
+
+    // 10. Entrega
+    log('   ARP no segmento de destino para ' + dst.ip + '…', 'info');
+    log(`✅ Roteamento OK. Enviando…`, 'ok');
+    log('Caminho físico: ' + physicalPath.map(id => getDevice(id)?.label).join(' → '), 'info');
+    animatePduTransfer(physicalPath, msg, src, dst);
+  }
+
+  /** Caminho de roteadores do start até um que tenha a rede destino como direta */
+  function findRouterPathToNetwork(startRouter, destIp, destMask) {
+    const destNet = getNetworkAddr(destIp, destMask);
+    const queue = [[startRouter.id]];
+    const visited = new Set([startRouter.id]);
+
+    while (queue.length) {
+      const path = queue.shift();
+      const last = path[path.length - 1];
+      const r = getDevice(last);
+      if (!r) continue;
+
+      // rede destino é direta neste roteador?
+      const direct = getDirectNetworks(r).some(n => {
+        const on = getNetworkAddr(destIp, n.mask);
+        return on === n.network;
+      });
+      if (direct) return path;
+
+      neighborsOf(last).forEach(n => {
+        if (n.type === 'router' && !visited.has(n.id)) {
+          visited.add(n.id);
+          queue.push([...path, n.id]);
+        }
+      });
+    }
+    return null;
+  }
+
+  // ========== ANIMAÇÃO PDU (Mensagem → Segmento → Pacote → Quadro → Binário) ==========
+  function textToBinary(text) {
+    return [...text].map(ch => ch.charCodeAt(0).toString(2).padStart(8, '0')).join(' ');
+  }
+
+  function shortBinary(text, maxGroups = 8) {
+    const bin = textToBinary(text);
+    const groups = bin.split(' ');
+    if (groups.length <= maxGroups) return bin;
+    return groups.slice(0, maxGroups).join(' ') + ' …';
+  }
+
+  function fakeMac(dev) {
+    // MAC didático derivado do id
+    const n = parseInt(String(dev.id).replace(/\D/g, ''), 10) || 1;
+    const h = (n * 17).toString(16).padStart(4, '0').slice(-4);
+    return `AA:BB:CC:DD:${h.slice(0, 2)}:${h.slice(2, 4)}`.toUpperCase();
+  }
+
+  function setPduView(kind, bodyHtml, metaHtml) {
+    const pdu = document.getElementById('pdu');
+    const typeEl = document.getElementById('pdu-type');
+    const bodyEl = document.getElementById('pdu-body');
+    const metaEl = document.getElementById('pdu-meta');
+    const labels = {
+      msg: '📝 Mensagem (Aplicação)',
+      segment: '📦 Segmento (Transporte)',
+      packet: '📨 Pacote (Rede / IP)',
+      frame: '🖼️ Quadro (Enlace)',
+      binary: '01 Binário (Físico)'
+    };
+    typeEl.className = 'pdu-type ' + kind;
+    typeEl.textContent = labels[kind] || kind;
+    bodyEl.innerHTML = bodyHtml;
+    metaEl.innerHTML = metaHtml || '';
+    pdu.classList.add('show');
+  }
+
+  function placePduAt(dev) {
+    const pdu = document.getElementById('pdu');
+    pdu.style.left = (dev.x + 45) + 'px';
+    pdu.style.top = (dev.y + 20) + 'px';
+  }
+
+  // Controle de pausa / play da simulação animada
+  const playback = {
+    running: false,
+    paused: false,
+    aborted: false,
+    _waiters: [],
+    start() {
+      this.running = true;
+      this.paused = false;
+      this.aborted = false;
+      this._waiters = [];
+      updatePlaybackUI();
+    },
+    pause() {
+      if (!this.running || this.paused) return;
+      this.paused = true;
+      document.getElementById('pdu')?.classList.add('paused-glow');
+      updatePlaybackUI();
+      log('⏸ Simulação pausada. Clique em ▶ ou pressione Espaço para continuar.', 'warn');
+    },
+    play() {
+      if (!this.running || !this.paused) return;
+      this.paused = false;
+      document.getElementById('pdu')?.classList.remove('paused-glow');
+      const waiters = this._waiters.splice(0);
+      waiters.forEach(fn => fn());
+      updatePlaybackUI();
+      log('▶ Simulação retomada.', 'info');
+    },
+    toggle() {
+      if (!this.running) return;
+      if (this.paused) this.play();
+      else this.pause();
+    },
+    stop() {
+      if (!this.running) return;
+      this.aborted = true;
+      this.paused = false;
+      this.running = false;
+      document.getElementById('pdu')?.classList.remove('paused-glow');
+      const waiters = this._waiters.splice(0);
+      waiters.forEach(fn => fn());
+      updatePlaybackUI();
+    },
+    end() {
+      this.running = false;
+      this.paused = false;
+      this.aborted = false;
+      document.getElementById('pdu')?.classList.remove('paused-glow');
+      updatePlaybackUI();
+    },
+    waitWhilePaused() {
+      if (!this.paused || !this.running) return Promise.resolve();
+      return new Promise(resolve => this._waiters.push(resolve));
+    }
+  };
+
+  function updatePlaybackUI() {
+    const btnPause = document.getElementById('btn-sim-pause');
+    const btnPlay = document.getElementById('btn-sim-play');
+    const btnStop = document.getElementById('btn-sim-stop');
+    const status = document.getElementById('playback-status');
+    if (!btnPause || !btnPlay) return;
+
+    if (!playback.running) {
+      btnPause.style.display = '';
+      btnPlay.style.display = 'none';
+      btnPause.disabled = true;
+      btnPlay.disabled = true;
+      if (btnStop) btnStop.disabled = true;
+      if (status) {
+        status.textContent = '';
+        status.className = 'playback-status';
+      }
+      return;
+    }
+
+    if (btnStop) btnStop.disabled = false;
+    if (playback.paused) {
+      btnPause.style.display = 'none';
+      btnPlay.style.display = '';
+      btnPause.disabled = true;
+      btnPlay.disabled = false;
+      if (status) {
+        status.textContent = '⏸ Pausado — pressione Espaço ou ▶ para continuar';
+        status.className = 'playback-status paused';
+      }
+    } else {
+      btnPause.style.display = '';
+      btnPlay.style.display = 'none';
+      btnPause.disabled = false;
+      btnPlay.disabled = true;
+      if (status) {
+        status.textContent = '▶ Em reprodução — Espaço pausa · ⏹ para';
+        status.className = 'playback-status';
+      }
+    }
+  }
+
+  function movePdu(from, to, duration) {
+    return new Promise(async resolve => {
+      if (playback.aborted) { resolve(); return; }
+      await playback.waitWhilePaused();
+      if (playback.aborted) { resolve(); return; }
+
+      const pdu = document.getElementById('pdu');
+      const startX = from.x + 45;
+      const startY = from.y + 20;
+      const endX = to.x + 45;
+      const endY = to.y + 20;
+      let elapsed = 0;
+      let last = performance.now();
+
+      function tick(now) {
+        if (playback.aborted) {
+          resolve();
+          return;
+        }
+        if (playback.paused) {
+          last = now;
+          requestAnimationFrame(tick);
+          return;
+        }
+        elapsed += now - last;
+        last = now;
+        const t = Math.min(1, elapsed / duration);
+        const ease = t < 0.5 ? 2 * t * t : -1 + (4 - 2 * t) * t;
+        pdu.style.left = (startX + (endX - startX) * ease) + 'px';
+        pdu.style.top = (startY + (endY - startY) * ease) + 'px';
+        if (t < 1) requestAnimationFrame(tick);
+        else resolve();
+      }
+      pdu.style.left = startX + 'px';
+      pdu.style.top = startY + 'px';
+      requestAnimationFrame(tick);
+    });
+  }
+
+  async function sleep(ms) {
+    let left = ms;
+    while (left > 0) {
+      if (playback.aborted) return;
+      await playback.waitWhilePaused();
+      if (playback.aborted) return;
+      const chunk = Math.min(80, left);
+      await new Promise(r => setTimeout(r, chunk));
+      if (!playback.paused) left -= chunk;
+    }
+  }
+
+  function showTransformPanel(title, steps, activeIdx) {
+    const panel = document.getElementById('transform-panel');
+    const titleEl = document.getElementById('tf-title');
+    const stepsEl = document.getElementById('tf-steps');
+    titleEl.textContent = title;
+    stepsEl.innerHTML = steps.map((s, i) => {
+      const cls = i < activeIdx ? 'done' : i === activeIdx ? 'active' : '';
+      return `<div class="tf-step ${cls}">
+        <span class="tf-badge ${s.kind}">${s.badge}</span>
+        <span>${s.text}</span>
+      </div>`;
+    }).join('');
+    panel.classList.add('show');
+    updatePlaybackUI();
+  }
+
+  function hideTransformPanel() {
+    document.getElementById('transform-panel').classList.remove('show');
+  }
+
+  function finishSimulationVisual() {
+    document.getElementById('pdu')?.classList.remove('show', 'paused-glow');
+    hideTransformPanel();
+    playback.end();
+  }
+
+  function clearHostBubbles() {
+    document.querySelectorAll('.host-msg-bubble').forEach(el => el.remove());
+  }
+
+  function showHostMessageBubble(dev, msg) {
+    clearHostBubbles();
+    const el = document.getElementById(dev.id);
+    if (!el) return;
+    // device precisa de position relative para a bolha
+    el.style.position = 'absolute';
+    const bubble = document.createElement('div');
+    bubble.className = 'host-msg-bubble';
+    bubble.innerHTML = `<span class="bubble-label">📩 Recebido</span>"${msg.replace(/"/g, '&quot;')}"`;
+    el.appendChild(bubble);
+    // remove após alguns segundos
+    setTimeout(() => bubble.remove(), 8000);
+  }
+
+  async function animatePduTransfer(path, msg, src, dst) {
+    if (playback.running) {
+      log('Já existe uma simulação em andamento. Pause/pare antes de iniciar outra.', 'warn');
+      return;
+    }
+    playback.start();
+    clearHostBubbles();
+    const pdu = document.getElementById('pdu');
+    const srcMac = fakeMac(src);
+    const dstMac = fakeMac(dst);
+    const srcIp = src.ip || '0.0.0.0';
+    const dstIp = dst.ip || '0.0.0.0';
+    const binFull = textToBinary(msg);
+    const binShort = shortBinary(msg);
+
+    const encapSteps = [
+      { kind: 'msg', badge: 'Mensagem', text: `Dados da aplicação: "${msg}"` },
+      { kind: 'segment', badge: 'Segmento', text: 'Camada de Transporte (TCP) — portas + dados' },
+      { kind: 'packet', badge: 'Pacote', text: `Camada de Rede (IP) — ${srcIp} → ${dstIp}` },
+      { kind: 'frame', badge: 'Quadro', text: `Camada de Enlace — MAC ${srcMac} → ${dstMac}` },
+      { kind: 'binary', badge: 'Binário', text: 'Camada Física — bits no meio' }
+    ];
+    const decapSteps = [
+      { kind: 'binary', badge: 'Binário', text: 'Bits chegam no destino' },
+      { kind: 'frame', badge: 'Quadro', text: 'Remove cabeçalho de enlace (MAC)' },
+      { kind: 'packet', badge: 'Pacote', text: 'Remove cabeçalho IP' },
+      { kind: 'segment', badge: 'Segmento', text: 'Remove cabeçalho de transporte' },
+      { kind: 'msg', badge: 'Mensagem', text: `Entrega à aplicação: "${msg}"` }
+    ];
+
+    try {
+    // —— Encapsulamento na origem ——
+    placePduAt(src);
+    pdu.classList.add('show');
+    log('——— Encapsulamento na origem ———', 'action');
+    log('Controles: ⏸ pausar · ▶ continuar · ⏹ parar (ou tecla Espaço).', 'info');
+
+    // 1 Mensagem
+    showTransformPanel(`Encapsulamento em ${src.label}`, encapSteps, 0);
+    setPduView('msg', `"${msg}"`, '<strong>Camada 7</strong> — dados da aplicação');
+    log(`📝 Mensagem (aplicação): "${msg}"`, 'info');
+    await sleep(1400);
+    if (playback.aborted) throw new Error('aborted');
+
+    // 2 Segmento
+    showTransformPanel(`Encapsulamento em ${src.label}`, encapSteps, 1);
+    setPduView(
+      'segment',
+      `"${msg}"`,
+      `<strong>TCP</strong> · porta origem 49152 · porta destino 80 · seq 1`
+    );
+    log('📦 → Segmento (Transporte): adiciona portas TCP e número de sequência.', 'info');
+    await sleep(1400);
+    if (playback.aborted) throw new Error('aborted');
+
+    // 3 Pacote
+    showTransformPanel(`Encapsulamento em ${src.label}`, encapSteps, 2);
+    setPduView(
+      'packet',
+      `"${msg}"`,
+      `<strong>IP</strong> · origem ${srcIp} · destino ${dstIp} · TTL 64`
+    );
+    log(`📨 → Pacote (Rede): IP origem ${srcIp} → destino ${dstIp}.`, 'info');
+    await sleep(1400);
+    if (playback.aborted) throw new Error('aborted');
+
+    // 4 Quadro
+    showTransformPanel(`Encapsulamento em ${src.label}`, encapSteps, 3);
+    setPduView(
+      'frame',
+      `"${msg}"`,
+      `<strong>Ethernet</strong> · src ${srcMac} · dst ${dstMac}`
+    );
+    log(`🖼️ → Quadro (Enlace): MAC origem ${srcMac} → destino ${dstMac}.`, 'info');
+    await sleep(1400);
+    if (playback.aborted) throw new Error('aborted');
+
+    // 5 Binário
+    showTransformPanel(`Encapsulamento em ${src.label}`, encapSteps, 4);
+    setPduView(
+      'binary',
+      `<div class="pdu-binary">${binShort}</div>`,
+      `<strong>Físico</strong> · ${binFull.replace(/ /g, '').length} bits`
+    );
+    log(`01 → Binário (Físico): ${binShort}`, 'info');
+    await sleep(1600);
+    if (playback.aborted) throw new Error('aborted');
+
+    // —— Trânsito hop a hop como binário/quadro ——
+    log('——— Trânsito no meio físico ———', 'action');
+    showTransformPanel('No cabo / meios', [
+      { kind: 'binary', badge: 'Binário', text: 'Bits trafegando entre dispositivos' },
+      { kind: 'frame', badge: 'Quadro', text: 'Switches encaminham por MAC (camada 2)' },
+      { kind: 'packet', badge: 'Pacote', text: 'Roteadores encaminham por IP (camada 3)' }
+    ], 0);
+
+    let stepIdx = 0;
+    while (stepIdx < path.length - 1) {
+      if (playback.aborted) throw new Error('aborted');
+      const from = getDevice(path[stepIdx]);
+      const to = getDevice(path[stepIdx + 1]);
+
+      // visual conforme tipo do próximo nó
+      if (to.type === 'switch' || from.type === 'switch') {
+        showTransformPanel('No cabo / meios', [
+          { kind: 'binary', badge: 'Binário', text: 'Bits no meio físico' },
+          { kind: 'frame', badge: 'Quadro', text: `${from.label} → ${to.label} (L2)` },
+          { kind: 'packet', badge: 'Pacote', text: 'IP permanece encapsulado' }
+        ], 1);
+        setPduView(
+          'frame',
+          `<div class="pdu-binary">${binShort}</div>`,
+          `<strong>Quadro</strong> ${from.label} → ${to.label}`
+        );
+      } else if (to.type === 'router' || from.type === 'router') {
+        showTransformPanel('No cabo / meios', [
+          { kind: 'binary', badge: 'Binário', text: 'Bits no meio físico' },
+          { kind: 'frame', badge: 'Quadro', text: 'Novo quadro no enlace' },
+          { kind: 'packet', badge: 'Pacote', text: `Roteamento IP ${srcIp} → ${dstIp}` }
+        ], 2);
+        setPduView(
+          'packet',
+          `"${msg}"`,
+          `<strong>Pacote IP</strong> · via ${from.label} → ${to.label}`
+        );
+      } else {
+        setPduView(
+          'binary',
+          `<div class="pdu-binary">${binShort}</div>`,
+          `<strong>Bits</strong> · ${from.label} → ${to.label}`
+        );
+      }
+
+      log(`  ↳ ${from.label} → ${to.label} (${to.type === 'router' ? 'pacote IP' : to.type === 'switch' ? 'quadro L2' : 'bits'})`, 'info');
+      await movePdu(from, to, 1500);
+      if (playback.aborted) throw new Error('aborted');
+      await sleep(450);
+      stepIdx++;
+    }
+
+    // —— Desencapsulamento no destino ——
+    const dest = getDevice(path[path.length - 1]);
+    placePduAt(dest);
+    log('——— Desencapsulamento no destino ———', 'action');
+
+    showTransformPanel(`Desencapsulamento em ${dest.label}`, decapSteps, 0);
+    setPduView('binary', `<div class="pdu-binary">${binShort}</div>`, '<strong>Físico</strong> · bits recebidos');
+    log('01 Binário recebido no destino.', 'info');
+    await sleep(1200);
+    if (playback.aborted) throw new Error('aborted');
+
+    showTransformPanel(`Desencapsulamento em ${dest.label}`, decapSteps, 1);
+    setPduView('frame', `"${msg}"`, `<strong>Quadro</strong> · remove MAC · entrega à rede`);
+    log('🖼️ Remove cabeçalho do quadro (enlace).', 'info');
+    await sleep(1200);
+    if (playback.aborted) throw new Error('aborted');
+
+    showTransformPanel(`Desencapsulamento em ${dest.label}`, decapSteps, 2);
+    setPduView('packet', `"${msg}"`, `<strong>IP</strong> · destino ${dstIp} OK · remove cabeçalho`);
+    log('📨 Remove cabeçalho do pacote (IP).', 'info');
+    await sleep(1200);
+    if (playback.aborted) throw new Error('aborted');
+
+    showTransformPanel(`Desencapsulamento em ${dest.label}`, decapSteps, 3);
+    setPduView('segment', `"${msg}"`, '<strong>TCP</strong> · porta destino · remove cabeçalho');
+    log('📦 Remove cabeçalho do segmento (transporte).', 'info');
+    await sleep(1200);
+    if (playback.aborted) throw new Error('aborted');
+
+    showTransformPanel(`Desencapsulamento em ${dest.label}`, decapSteps, 4);
+    setPduView('msg', `"${msg}"`, '<strong>Aplicação</strong> · mensagem entregue');
+    log(`📝 Mensagem entregue à aplicação em ${dest.label}.`, 'ok');
+    await sleep(900);
+    if (playback.aborted) throw new Error('aborted');
+
+    // Bolha ao lado do host destino
+    showHostMessageBubble(dest, msg);
+    log(`📩 ⑩ Pacote chegou! Mensagem em ${dest.label}: "${msg}"`, 'ok');
+
+    await sleep(1800);
+    } catch (e) {
+      if (e && e.message === 'aborted') {
+        log('⏹ Simulação interrompida pelo usuário.', 'warn');
+      } else if (e) {
+        console.error(e);
+      }
+    } finally {
+      finishSimulationVisual();
+    }
+  }
+
+  // ========== SIDEBAR REDIMENSIONÁVEL ==========
+  const SIDEBAR_SPLIT_KEY = 'sft_redes_sidebar_split_v1';
+  const SPLITTER_H = 6;
+  const MIN_PANEL = 56;
+
+  function defaultSidebarSplits() {
+    return { props: 0.62, log: 0.22, val: 0.16 };
+  }
+
+  function loadSidebarSplits() {
+    try {
+      const raw = localStorage.getItem(SIDEBAR_SPLIT_KEY);
+      if (!raw) return defaultSidebarSplits();
+      const s = JSON.parse(raw);
+      if (typeof s.props === 'number' && typeof s.log === 'number' && typeof s.val === 'number') {
+        const sum = s.props + s.log + s.val;
+        if (sum > 0.5) {
+          return { props: s.props / sum, log: s.log / sum, val: s.val / sum };
+        }
+      }
+    } catch (_) { /* ignore */ }
+    return defaultSidebarSplits();
+  }
+
+  function saveSidebarSplits(splits) {
+    try {
+      localStorage.setItem(SIDEBAR_SPLIT_KEY, JSON.stringify(splits));
+    } catch (_) { /* ignore */ }
+  }
+
+  function applySidebarSplits(splits) {
+    const sidebar = document.getElementById('sidebar');
+    const props = document.getElementById('properties');
+    const logSec = document.getElementById('log-section');
+    const valSec = document.getElementById('validation-section');
+    if (!sidebar || !props || !logSec || !valSec) return;
+
+    const totalH = sidebar.clientHeight;
+    const usable = Math.max(0, totalH - SPLITTER_H * 2);
+    if (usable < MIN_PANEL * 3) return;
+
+    let hProps = Math.round(usable * splits.props);
+    let hLog = Math.round(usable * splits.log);
+    let hVal = usable - hProps - hLog;
+
+    // respeita mínimos redistribuindo o excesso
+    if (hProps < MIN_PANEL) {
+      const need = MIN_PANEL - hProps;
+      hProps = MIN_PANEL;
+      if (hLog - need >= MIN_PANEL) hLog -= need;
+      else { hVal = Math.max(MIN_PANEL, hVal - need); hLog = usable - hProps - hVal; }
+    }
+    if (hLog < MIN_PANEL) {
+      const need = MIN_PANEL - hLog;
+      hLog = MIN_PANEL;
+      if (hProps - need >= MIN_PANEL) hProps -= need;
+      else { hVal = Math.max(MIN_PANEL, hVal - need); hProps = usable - hLog - hVal; }
+    }
+    if (hVal < MIN_PANEL) {
+      const need = MIN_PANEL - hVal;
+      hVal = MIN_PANEL;
+      if (hLog - need >= MIN_PANEL) hLog -= need;
+      else { hProps = Math.max(MIN_PANEL, hProps - need); hLog = usable - hProps - hVal; }
+    }
+
+    // corrige soma final
+    const sum = hProps + hLog + hVal;
+    if (sum !== usable) hProps += usable - sum;
+
+    props.style.flex = `0 0 ${hProps}px`;
+    props.style.height = hProps + 'px';
+    props.style.minHeight = MIN_PANEL + 'px';
+    logSec.style.flex = `0 0 ${hLog}px`;
+    logSec.style.height = hLog + 'px';
+    logSec.style.minHeight = MIN_PANEL + 'px';
+    valSec.style.flex = `0 0 ${hVal}px`;
+    valSec.style.height = hVal + 'px';
+    valSec.style.minHeight = MIN_PANEL + 'px';
+
+    const total = hProps + hLog + hVal;
+    if (total > 0) {
+      splits.props = hProps / total;
+      splits.log = hLog / total;
+      splits.val = hVal / total;
+    }
+  }
+
+  function initSidebarResize() {
+    const sidebar = document.getElementById('sidebar');
+    const split1 = document.getElementById('split-props-log');
+    const split2 = document.getElementById('split-log-val');
+    if (!sidebar || !split1 || !split2) return;
+
+    const splits = loadSidebarSplits();
+    applySidebarSplits(splits);
+
+    let drag = null;
+
+    function onMove(e) {
+      if (!drag) return;
+      const totalH = sidebar.clientHeight;
+      const usable = Math.max(0, totalH - SPLITTER_H * 2);
+      if (usable < MIN_PANEL * 3) return;
+
+      const y = e.clientY;
+      const rect = sidebar.getBoundingClientRect();
+      const relY = y - rect.top;
+
+      if (drag.which === 1) {
+        // entre propriedades e log
+        let hProps = Math.round(relY - SPLITTER_H / 2);
+        hProps = Math.max(MIN_PANEL, Math.min(hProps, usable - MIN_PANEL * 2));
+        const rest = usable - hProps;
+        // mantém proporção entre log e val no restante
+        const pair = drag.logRatio + drag.valRatio;
+        let hLog = pair > 0 ? Math.round(rest * (drag.logRatio / pair)) : Math.round(rest / 2);
+        hLog = Math.max(MIN_PANEL, Math.min(hLog, rest - MIN_PANEL));
+        const hVal = rest - hLog;
+        splits.props = hProps / usable;
+        splits.log = hLog / usable;
+        splits.val = hVal / usable;
+      } else {
+        // entre log e validações
+        const propsH = Math.round(usable * splits.props);
+        let hProps = Math.max(MIN_PANEL, Math.min(propsH, usable - MIN_PANEL * 2));
+        // posição do segundo splitter ≈ hProps + SPLITTER + hLog + SPLITTER/2
+        let hLog = Math.round(relY - hProps - SPLITTER_H - SPLITTER_H / 2);
+        hLog = Math.max(MIN_PANEL, Math.min(hLog, usable - hProps - MIN_PANEL));
+        const hVal = usable - hProps - hLog;
+        splits.props = hProps / usable;
+        splits.log = hLog / usable;
+        splits.val = hVal / usable;
+      }
+      applySidebarSplits(splits);
+    }
+
+    function onUp() {
+      if (!drag) return;
+      drag.el.classList.remove('active');
+      document.body.classList.remove('sidebar-resizing');
+      drag = null;
+      saveSidebarSplits(splits);
+      document.removeEventListener('mousemove', onMove);
+      document.removeEventListener('mouseup', onUp);
+    }
+
+    function startDrag(which, el, e) {
+      e.preventDefault();
+      drag = {
+        which,
+        el,
+        logRatio: splits.log,
+        valRatio: splits.val
+      };
+      el.classList.add('active');
+      document.body.classList.add('sidebar-resizing');
+      document.addEventListener('mousemove', onMove);
+      document.addEventListener('mouseup', onUp);
+    }
+
+    split1.addEventListener('mousedown', e => startDrag(1, split1, e));
+    split2.addEventListener('mousedown', e => startDrag(2, split2, e));
+
+    window.addEventListener('resize', () => applySidebarSplits(splits));
+  }
+
+  // ========== EVENTOS ==========
+  document.getElementById('btn-host').onclick = () => createDevice('host');
+  document.getElementById('btn-switch').onclick = () => createDevice('switch');
+  document.getElementById('btn-router').onclick = () => createDevice('router');
+  document.getElementById('btn-dhcp').onclick = () => createDevice('dhcp');
+
+  document.getElementById('btn-connect').onclick = () => {
+    if (state.mode === 'connect') {
+      setMode('select');
+      log('Modo SELEÇÃO ativado. Você pode arrastar e configurar dispositivos.', 'info');
+    } else {
+      setMode('connect');
+      updateLinks();
+      log('🔌 MODO LIGAÇÃO ATIVO — clique em dois dispositivos para criar o cabo entre eles.', 'action');
+      log('Regras: Host↔Switch, DHCP↔Switch, Switch↔Roteador, Switch↔Switch, Roteador↔Roteador. Host↔Host bloqueado.', 'info');
+    }
+  };
+
+  document.getElementById('btn-delete').onclick = () => deleteSelectedDevices();
+  document.getElementById('btn-select-all').onclick = () => selectAllDevices();
+  document.getElementById('btn-canvas-select-all').onclick = () => selectAllDevices();
+  document.getElementById('btn-zoom-in').onclick = () => zoomBy(VIEW_ZOOM_STEP);
+  document.getElementById('btn-zoom-out').onclick = () => zoomBy(-VIEW_ZOOM_STEP);
+  document.getElementById('btn-zoom-reset').onclick = () => {
+    resetView();
+    log('Zoom e posição do quadro reiniciados.', 'info');
+  };
+
+  document.getElementById('btn-clear').onclick = () => {
+    if (!confirm('Tem certeza que deseja apagar toda a topologia?')) return;
+    state.devices = [];
+    state.links = [];
+    clearCanvasDevices();
+    updateLinks();
+    selectDevice(null);
+    log('Topologia limpa.', 'action');
+    markDirty();
+    saveTopology(true);
+    updateConnectUI();
+  };
+
+  document.getElementById('btn-save').onclick = () => saveTopology(false);
+  document.getElementById('btn-export').onclick = exportTopology;
+  document.getElementById('btn-import').onclick = () => document.getElementById('import-file').click();
+  document.getElementById('import-file').onchange = (e) => {
+    const file = e.target.files?.[0];
+    if (file) importTopology(file);
+    e.target.value = '';
+  };
+
+  document.getElementById('btn-validate').onclick = () => runValidation(true);
+  document.getElementById('btn-validate-side').onclick = () => runValidation(true);
+
+  document.getElementById('btn-clear-log').onclick = () => {
+    state.history = [];
+    renderLog();
+    persistLog();
+    log('Histórico de ações limpo.', 'info');
+  };
+
+  document.getElementById('btn-simulate').onclick = openSimulateModal;
+  document.getElementById('btn-cancel-sim').onclick = closeModal;
+  document.getElementById('btn-send-sim').onclick = simulateSend;
+
+  document.getElementById('btn-sim-pause').onclick = () => playback.pause();
+  document.getElementById('btn-sim-play').onclick = () => playback.play();
+  document.getElementById('btn-sim-stop').onclick = () => {
+    if (playback.running) playback.stop();
+  };
+
+  const canvasEl = document.getElementById('canvas');
+
+  canvasEl.addEventListener('click', e => {
+    if (e.target.closest('.device') || e.target.closest('.canvas-controls') || e.target.closest('#transform-panel')) return;
+    if (state.mode !== 'connect' && !state.dragging) selectDevice(null);
+  });
+
+  canvasEl.addEventListener('mousedown', e => {
+    if (e.target.closest('.device') || e.target.closest('.canvas-controls') || e.target.closest('#transform-panel') || e.target.closest('button')) return;
+    // botão do meio, Espaço+clique, Alt+clique ou arraste no fundo: pan
+    if (e.button === 1 || (e.button === 0 && (state.spaceDown || e.altKey || state.mode !== 'connect'))) {
+      if (state.mode === 'connect' && e.button === 0 && !state.spaceDown && !e.altKey) return;
+      e.preventDefault();
+      startPan(e);
+    }
+  });
+
+  canvasEl.addEventListener('wheel', e => {
+    e.preventDefault();
+    const dir = e.deltaY > 0 ? -VIEW_ZOOM_STEP : VIEW_ZOOM_STEP;
+    zoomBy(dir, e.clientX, e.clientY);
+  }, { passive: false });
+
+  canvasEl.addEventListener('contextmenu', e => {
+    // evita menu no botão do meio / pan
+    if (e.button === 1) e.preventDefault();
+  });
+
+  document.addEventListener('keydown', e => {
+    const tag = (e.target && e.target.tagName) || '';
+    const typing = tag === 'INPUT' || tag === 'TEXTAREA' || tag === 'SELECT';
+
+    if ((e.key === ' ' || e.code === 'Space') && !typing) {
+      if (playback.running) {
+        e.preventDefault();
+        playback.toggle();
+        return;
+      }
+      // Espaço segura: modo pan (cursor grab)
+      if (!state.spaceDown) {
+        state.spaceDown = true;
+        canvasEl.classList.add('space-pan');
+        e.preventDefault();
+      }
+      return;
+    }
+
+    if (!typing && (e.ctrlKey || e.metaKey) && e.key.toLowerCase() === 'a') {
+      e.preventDefault();
+      selectAllDevices();
+      return;
+    }
+
+    if (!typing && (e.key === '+' || e.key === '=')) {
+      if (e.ctrlKey || e.metaKey) {
+        e.preventDefault();
+        zoomBy(VIEW_ZOOM_STEP);
+      }
+    }
+    if (!typing && e.key === '-' && (e.ctrlKey || e.metaKey)) {
+      e.preventDefault();
+      zoomBy(-VIEW_ZOOM_STEP);
+    }
+    if (!typing && e.key === '0' && (e.ctrlKey || e.metaKey)) {
+      e.preventDefault();
+      resetView();
+    }
+
+    if (!typing && (e.key === 'Delete' || e.key === 'Backspace') && state.selectedIds.length) {
+      // não apagar ao digitar em campos — já coberto por typing
+      e.preventDefault();
+      deleteSelectedDevices();
+      return;
+    }
+
+    if (e.key === 'Escape') {
+      closeModal();
+      if (playback.running) {
+        playback.stop();
+        return;
+      }
+      if (state.mode === 'connect') {
+        if (state.connectFrom) {
+          state.connectFrom = null;
+          updateConnectUI();
+          log('Seleção do cabo cancelada (Esc).', 'info');
+        } else {
+          setMode('select');
+          updateLinks();
+          log('Modo SELEÇÃO ativado (Esc).', 'info');
+        }
+      } else if (state.selectedIds.length) {
+        selectDevice(null);
+      }
+    }
+    if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === 's') {
+      e.preventDefault();
+      saveTopology(false);
+    }
+  });
+
+  document.addEventListener('keyup', e => {
+    if (e.key === ' ' || e.code === 'Space') {
+      state.spaceDown = false;
+      canvasEl.classList.remove('space-pan');
+    }
+  });
+
+  updatePlaybackUI();
+
+  setInterval(() => {
+    if (state.dirty) saveTopology(true);
+  }, 20000);
+
+  window.addEventListener('beforeunload', () => {
+    if (state.dirty) {
+      try {
+        localStorage.setItem(STORAGE_KEY, JSON.stringify(serializeTopology()));
+      } catch (_) { /* ignore */ }
+    }
+  });
+
+  // ========== INIT ==========
+  loadLog();
+  renderLog();
+  initSidebarResize();
+  applyViewTransform();
+
+  const restored = loadTopology();
+  if (restored) {
+    log('Topologia anterior restaurada. Continue de onde parou.', 'ok');
+    log(`Restaurados: ${state.devices.length} dispositivo(s) e ${state.links.length} ligação(ões).`, 'info');
+  } else {
+    log('Simulador pronto com validações de topologia (estilo Packet Tracer).', 'info');
+    log('Use "Validar" para checar IPs, cabos, loops, rotas e DHCP. "Simular Mensagem" segue o fluxo completo de envio.', 'info');
+    log('DHCP: adicione + DHCP, configure escopo (range, máscara, gateway, DNS, lease). Nos hosts, modo DHCP → Obter IP.', 'info');
+    log('Renovação: na metade do lease (T1) o host pede renovação sozinho, com animação no quadro.', 'info');
+  }
+  ensureDhcpLeaseMonitor();
+  log('Quadro: scroll = zoom · arrastar fundo = mover visão · Ctrl+A = selecionar tudo e arrastar o grupo.', 'info');
+  updateSaveStatus();
+  runValidation(false);
+})();
+</script>
+</body>
+</html>
