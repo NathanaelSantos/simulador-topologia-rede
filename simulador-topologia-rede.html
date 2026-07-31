@@ -405,8 +405,28 @@
       width: 8000px;
       height: 8000px;
       overflow: visible;
-      pointer-events: none;
+      pointer-events: none; /* filhos .link-hit reativam clique no cabo */
       z-index: 1;
+    }
+    #connections .link-line {
+      pointer-events: none;
+    }
+    #connections .link-hit {
+      pointer-events: stroke;
+      cursor: pointer;
+    }
+    #connections .link-hit:hover + .link-line,
+    #connections g.link-selected .link-line {
+      /* destaque via JS / classe no grupo */
+    }
+    #connections g.link-selected .link-line {
+      stroke: #dc2626 !important;
+      stroke-width: 4.5 !important;
+      filter: drop-shadow(0 0 4px rgba(220, 38, 38, 0.45));
+    }
+    #connections g.link-hover .link-line {
+      stroke: #f59e0b !important;
+      stroke-width: 4 !important;
     }
     .device {
       position: absolute;
@@ -942,6 +962,7 @@
     links: [],
     selectedId: null,
     selectedIds: [],
+    selectedLinkId: null,
     mode: 'select',
     connectFrom: null,
     nextId: 1,
@@ -2946,6 +2967,61 @@
   }
 
   // ========== LINKS ==========
+  function findLinkBetween(id1, id2) {
+    return state.links.find(l =>
+      (l.from === id1 && l.to === id2) || (l.from === id2 && l.to === id1)
+    ) || null;
+  }
+
+  function getLinkEndpoints(link) {
+    const a = getDevice(link.from);
+    const b = getDevice(link.to);
+    return { a, b, label: `${a?.label || '?'} ↔ ${b?.label || '?'}` };
+  }
+
+  /** Remove um cabo e libera interfaces de roteador ligadas a ele. */
+  function removeLink(linkOrId, { silent = false } = {}) {
+    const link = typeof linkOrId === 'string'
+      ? state.links.find(l => l.id === linkOrId)
+      : linkOrId;
+    if (!link) return false;
+
+    const { label } = getLinkEndpoints(link);
+
+    state.devices.forEach(d => {
+      if (!d.interfaces) return;
+      d.interfaces.forEach(i => {
+        if (i.linkId === link.id) i.linkId = null;
+      });
+    });
+
+    state.links = state.links.filter(l => l.id !== link.id);
+    if (state.selectedLinkId === link.id) state.selectedLinkId = null;
+
+    updateLinks();
+    if (!silent) log(`Cabo removido: ${label}`, 'action');
+    markDirty();
+    renderProperties();
+    if (state.mode === 'connect') updateConnectUI();
+    return true;
+  }
+
+  function selectLink(linkId) {
+    state.selectedLinkId = linkId;
+    state.selectedId = null;
+    state.selectedIds = [];
+    state.connectFrom = null;
+    updateSelectionUI();
+    updateLinks();
+    renderProperties();
+  }
+
+  function clearLinkSelection() {
+    if (!state.selectedLinkId) return;
+    state.selectedLinkId = null;
+    updateLinks();
+  }
+
   function updateLinks() {
     const svg = document.getElementById('connections');
     svg.innerHTML = '';
@@ -2953,15 +3029,73 @@
       const d1 = state.devices.find(d => d.id === link.from);
       const d2 = state.devices.find(d => d.id === link.to);
       if (!d1 || !d2) return;
+
+      const x1 = d1.x + 45, y1 = d1.y + 32;
+      const x2 = d2.x + 45, y2 = d2.y + 32;
+      const selected = state.selectedLinkId === link.id;
+      const stroke = selected
+        ? '#dc2626'
+        : (state.mode === 'connect' ? '#10b981' : '#94a3b8');
+      const width = selected ? 4.5 : (state.mode === 'connect' ? 3.5 : 3);
+
+      const g = document.createElementNS('http://www.w3.org/2000/svg', 'g');
+      g.setAttribute('data-link-id', link.id);
+      g.classList.add('link-group');
+      if (selected) g.classList.add('link-selected');
+
+      // área de clique mais larga (invisível)
+      const hit = document.createElementNS('http://www.w3.org/2000/svg', 'line');
+      hit.setAttribute('x1', x1);
+      hit.setAttribute('y1', y1);
+      hit.setAttribute('x2', x2);
+      hit.setAttribute('y2', y2);
+      hit.setAttribute('stroke', 'transparent');
+      hit.setAttribute('stroke-width', '16');
+      hit.setAttribute('stroke-linecap', 'round');
+      hit.classList.add('link-hit');
+      hit.style.pointerEvents = 'stroke';
+      hit.style.cursor = 'pointer';
+
       const line = document.createElementNS('http://www.w3.org/2000/svg', 'line');
-      line.setAttribute('x1', d1.x + 45);
-      line.setAttribute('y1', d1.y + 32);
-      line.setAttribute('x2', d2.x + 45);
-      line.setAttribute('y2', d2.y + 32);
-      line.setAttribute('stroke', state.mode === 'connect' ? '#10b981' : '#94a3b8');
-      line.setAttribute('stroke-width', state.mode === 'connect' ? '3.5' : '3');
+      line.setAttribute('x1', x1);
+      line.setAttribute('y1', y1);
+      line.setAttribute('x2', x2);
+      line.setAttribute('y2', y2);
+      line.setAttribute('stroke', stroke);
+      line.setAttribute('stroke-width', String(width));
       line.setAttribute('stroke-linecap', 'round');
-      svg.appendChild(line);
+      line.classList.add('link-line');
+
+      hit.addEventListener('mouseenter', () => {
+        if (!selected) g.classList.add('link-hover');
+      });
+      hit.addEventListener('mouseleave', () => g.classList.remove('link-hover'));
+      hit.addEventListener('click', e => {
+        e.stopPropagation();
+        e.preventDefault();
+        if (state.mode === 'connect') {
+          // no modo ligar, clique no cabo já desconecta
+          removeLink(link);
+          return;
+        }
+        selectLink(link.id);
+        log(`Cabo selecionado: ${getLinkEndpoints(link).label}. Pressione Delete ou Excluir para remover.`, 'info');
+      });
+      hit.addEventListener('dblclick', e => {
+        e.stopPropagation();
+        e.preventDefault();
+        removeLink(link);
+      });
+      hit.addEventListener('contextmenu', e => {
+        e.preventDefault();
+        e.stopPropagation();
+        removeLink(link);
+      });
+
+      // hit por cima para receber o mouse (ordem: line depois hit não funciona; hit primeiro e line com pointer-events none)
+      g.appendChild(line);
+      g.appendChild(hit);
+      svg.appendChild(g);
     });
   }
 
@@ -2972,9 +3106,11 @@
       return;
     }
 
-    if (state.links.some(l =>
-      (l.from === d1.id && l.to === d2.id) || (l.from === d2.id && l.to === d1.id))) {
-      log('Já existe conexão entre esses dispositivos.', 'err');
+    // Já existe ligação? Desfaz (desconecta)
+    const existing = findLinkBetween(d1.id, d2.id);
+    if (existing) {
+      removeLink(existing, { silent: true });
+      log(`Ligação desfeita: ${d1.label} ↔ ${d2.label}.`, 'ok');
       return;
     }
 
@@ -3171,7 +3307,9 @@
   function selectDevice(id) {
     state.selectedId = id;
     state.selectedIds = id ? [id] : [];
+    if (id) state.selectedLinkId = null;
     updateSelectionUI();
+    updateLinks();
     renderProperties();
   }
 
@@ -3204,11 +3342,16 @@
   }
 
   function deleteSelectedDevices() {
+    // prioridade: cabo selecionado
+    if (state.selectedLinkId) {
+      removeLink(state.selectedLinkId);
+      return;
+    }
     const ids = state.selectedIds.length
       ? [...state.selectedIds]
       : (state.selectedId ? [state.selectedId] : []);
     if (!ids.length) {
-      log('Nenhum dispositivo selecionado.', 'err');
+      log('Nenhum dispositivo ou cabo selecionado. Clique no cabo ou no dispositivo e use Excluir.', 'err');
       return;
     }
     const labels = ids.map(id => getDevice(id)?.label || id);
@@ -3265,6 +3408,28 @@
 
   function renderProperties() {
     const panel = document.getElementById('properties');
+    if (state.selectedLinkId) {
+      const link = state.links.find(l => l.id === state.selectedLinkId);
+      if (!link) {
+        state.selectedLinkId = null;
+      } else {
+        const { a, b, label } = getLinkEndpoints(link);
+        panel.innerHTML = `
+          <h3>🔌 Cabo selecionado</h3>
+          <p style="color:#334155;font-size:0.9rem;margin-top:8px;font-weight:600;">${label}</p>
+          <p class="hint" style="margin-top:8px;">
+            <strong>${a?.label || '?'}</strong> (${a?.type || '?'})
+            ↔
+            <strong>${b?.label || '?'}</strong> (${b?.type || '?'})
+          </p>
+          <div class="prop-actions" style="margin-top:14px;">
+            <button type="button" id="btn-remove-link" class="danger" style="width:100%;background:#dc2626;">✂ Desfazer ligação (remover cabo)</button>
+          </div>
+          <p class="hint" style="margin-top:10px;">Atalhos: <strong>Delete</strong> · <strong>duplo clique</strong> no cabo · <strong>botão direito</strong> no cabo · no modo Conectar, clique de novo nos mesmos dois dispositivos.</p>`;
+        document.getElementById('btn-remove-link').onclick = () => removeLink(link);
+        return;
+      }
+    }
     if (state.selectedIds.length > 1) {
       const names = state.selectedIds.map(id => getDevice(id)?.label || id).join(', ');
       panel.innerHTML = `
@@ -3280,6 +3445,7 @@
         <p style="color:#64748b;font-size:0.85rem;">Selecione um dispositivo para configurar endereçamento IP, máscara e gateway.</p>
         <p class="hint">Validações: IP único, rede/broadcast, gateway, DHCP (escopo/range/lease), cabos e loops de switch.</p>
         <p class="hint" style="margin-top:10px;color:#94a3b8;">🔌 <strong>Modo Conectar:</strong> ative na barra, clique em dois dispositivos. Host↔Host é bloqueado.</p>
+        <p class="hint" style="margin-top:8px;">✂ <strong>Desfazer cabo:</strong> clique no cabo (fica vermelho) + Excluir · ou duplo clique · ou botão direito · ou ligue de novo os mesmos dois no modo Conectar.</p>
         <p class="hint" style="margin-top:8px;">📦 <strong>DHCP:</strong> + DHCP → configure pool → no host, modo DHCP → Obter IP. Use Validar e Simular Mensagem para testar.</p>
         <p class="hint" style="margin-top:8px;">Zoom: scroll no quadro · Mover visão: arraste o fundo · Selecionar tudo: Ctrl+A</p>`;
       return;
@@ -3707,9 +3873,10 @@
 
   // ========== MODO CONECTAR ==========
   function handleConnectClick(dev) {
+    state.selectedLinkId = null;
     if (!state.connectFrom) {
       state.connectFrom = dev;
-      log(`Ponto de origem da ligação: ${dev.label}. Clique no destino.`, 'info');
+      log(`Ponto de origem da ligação: ${dev.label}. Clique no destino (ou no mesmo cabo de novo para desfazer).`, 'info');
     } else if (state.connectFrom.id === dev.id) {
       state.connectFrom = null;
       log('Seleção do cabo cancelada. Escolha outro primeiro dispositivo.', 'info');
@@ -3718,6 +3885,7 @@
       state.connectFrom = null;
     }
     updateConnectUI();
+    updateLinks();
   }
 
   // ========== SIMULAÇÃO (FLUXO COMPLETO) ==========
@@ -4576,6 +4744,7 @@
       updateLinks();
       log('🔌 MODO LIGAÇÃO ATIVO — clique em dois dispositivos para criar o cabo entre eles.', 'action');
       log('Regras: Host↔Switch, DHCP↔Switch, Switch↔Roteador, Switch↔Switch, Roteador↔Roteador. Host↔Host bloqueado.', 'info');
+      log('Para DESFAZER: clique nos mesmos dois de novo, ou clique no cabo, ou botão direito no cabo.', 'info');
     }
   };
 
@@ -4635,7 +4804,11 @@
 
   canvasEl.addEventListener('click', e => {
     if (e.target.closest('.device') || e.target.closest('.canvas-controls') || e.target.closest('#transform-panel')) return;
-    if (state.mode !== 'connect' && !state.dragging) selectDevice(null);
+    if (e.target.closest('.link-hit') || e.target.closest('.link-group')) return;
+    if (state.mode !== 'connect' && !state.dragging) {
+      state.selectedLinkId = null;
+      selectDevice(null);
+    }
   });
 
   canvasEl.addEventListener('mousedown', e => {
@@ -4699,7 +4872,8 @@
       resetView();
     }
 
-    if (!typing && (e.key === 'Delete' || e.key === 'Backspace') && state.selectedIds.length) {
+    if (!typing && (e.key === 'Delete' || e.key === 'Backspace') &&
+        (state.selectedIds.length || state.selectedLinkId)) {
       // não apagar ao digitar em campos — já coberto por typing
       e.preventDefault();
       deleteSelectedDevices();
