@@ -982,8 +982,12 @@
 
   // ========== UTILITÁRIOS DE IP ==========
   function ipToNumber(ip) {
-    if (!ip || !/^\d{1,3}(\.\d{1,3}){3}$/.test(ip)) return null;
-    const parts = ip.split('.').map(Number);
+    if (!ip || typeof ip !== 'string') return null;
+    // aceita espaços e sufixo /CIDR acidental no campo de IP
+    let s = ip.trim().replace(/\s+/g, '');
+    s = s.replace(/\/\d{1,2}$/, '');
+    if (!/^\d{1,3}(\.\d{1,3}){3}$/.test(s)) return null;
+    const parts = s.split('.').map(Number);
     if (parts.some(p => p > 255)) return null;
     return ((parts[0] << 24) | (parts[1] << 16) | (parts[2] << 8) | parts[3]) >>> 0;
   }
@@ -998,15 +1002,45 @@
   }
 
   function isValidMask(mask) {
-    const n = ipToNumber(mask);
+    const n = ipToNumber(typeof mask === 'string' ? normalizeMask(mask) || mask : mask);
     if (n === null) return false;
     // máscara contígua: 1s seguidos de 0s
     const inv = (~n) >>> 0;
     return (inv & (inv + 1)) === 0;
   }
 
+  /**
+   * Normaliza máscara: aceita 255.255.255.252, /30 ou 30.
+   * Retorna dotted decimal ou null se inválida.
+   */
+  function normalizeMask(mask) {
+    if (mask == null || mask === '') return null;
+    if (typeof mask === 'number' && Number.isInteger(mask) && mask >= 0 && mask <= 32) {
+      if (mask === 0) return '0.0.0.0';
+      return numberToIp((0xffffffff << (32 - mask)) >>> 0);
+    }
+    let s = String(mask).trim().replace(/\s+/g, '');
+    if (!s) return null;
+    // /30 ou 30
+    const cidrMatch = s.match(/^\/?(\d{1,2})$/);
+    if (cidrMatch) {
+      const c = parseInt(cidrMatch[1], 10);
+      if (c < 0 || c > 32) return null;
+      if (c === 0) return '0.0.0.0';
+      return numberToIp((0xffffffff << (32 - c)) >>> 0);
+    }
+    // dotted decimal
+    const n = ipToNumber(s);
+    if (n === null) return null;
+    const inv = (~n) >>> 0;
+    if ((inv & (inv + 1)) !== 0) return null;
+    return s;
+  }
+
   function maskToPrefix(mask) {
-    const n = ipToNumber(mask);
+    const dotted = normalizeMask(mask);
+    if (!dotted) return null;
+    const n = ipToNumber(dotted);
     if (n === null) return null;
     let bits = 0;
     let x = n;
@@ -1016,20 +1050,20 @@
       x = (x << 1) >>> 0;
     }
     // verifica contígua
-    if (!isValidMask(mask)) return null;
+    if (!isValidMask(dotted)) return null;
     return bits;
   }
 
   function getNetworkAddr(ip, mask) {
     const ipN = ipToNumber(ip);
-    const maskN = ipToNumber(mask);
+    const maskN = ipToNumber(normalizeMask(mask) || mask);
     if (ipN === null || maskN === null) return null;
     return (ipN & maskN) >>> 0;
   }
 
   function getBroadcastAddr(ip, mask) {
     const ipN = ipToNumber(ip);
-    const maskN = ipToNumber(mask);
+    const maskN = ipToNumber(normalizeMask(mask) || mask);
     if (ipN === null || maskN === null) return null;
     return (ipN | (~maskN >>> 0)) >>> 0;
   }
@@ -1066,13 +1100,18 @@
       issues.push({ level: 'err', msg: `${label}: endereço IP inválido (${ip}).`, devices: [] });
       return issues;
     }
-    if (!mask || !isValidMask(mask)) {
-      issues.push({ level: 'err', msg: `${label}: máscara inválida (${mask || 'vazia'}).`, devices: [] });
+    const normMask = normalizeMask(mask);
+    if (!mask || !normMask) {
+      issues.push({
+        level: 'err',
+        msg: `${label}: máscara inválida (${mask || 'vazia'}). Use 255.255.255.252 ou /30.`,
+        devices: []
+      });
       return issues;
     }
-    const net = getNetworkAddr(ip, mask);
-    const bcast = getBroadcastAddr(ip, mask);
-    const prefix = maskToPrefix(mask);
+    const net = getNetworkAddr(ip, normMask);
+    const bcast = getBroadcastAddr(ip, normMask);
+    const prefix = maskToPrefix(normMask);
     if (net !== null && ipN === net && prefix !== null && prefix < 31) {
       issues.push({
         level: 'err',
@@ -2221,6 +2260,9 @@
 
   // ========== VALIDAÇÃO COMPLETA DA TOPOLOGIA ==========
   function validateTopology() {
+    // Antes de validar: se o /30 está em Gi0/1 e o cabo em Gi0/0, realinha
+    rebindP2PLinks();
+
     const issues = [];
     const endpoints = collectIpEndpoints();
 
@@ -2413,7 +2455,7 @@
           )) {
             issues.push({
               level: 'err',
-              msg: `Enlace ${a.label} ↔ ${b.label}: as interfaces não estão na mesma subrede do enlace.`,
+              msg: `Enlace ${a.label} ↔ ${b.label}: ${ia.name}=${ia.ip}/${maskToPrefix(ia.mask) ?? '?'} e ${ib.name}=${ib.ip}/${maskToPrefix(ib.mask) ?? '?'} não estão na mesma sub-rede. Exemplo válido: 10.0.0.1 e 10.0.0.2 com máscara 255.255.255.252 (/30).`,
               devices: [a.id, b.id]
             });
           }
@@ -2456,9 +2498,18 @@
             });
           }
         } else if (!ia?.ip || !ib?.ip) {
+          // IPs do /30 podem estar em outra interface (ex.: cabo em Gi0/0, IP em Gi0/1)
+          const otherA = a.interfaces.filter(i => i.ip && i !== ia).map(i => `${i.name}=${i.ip}`).join(', ');
+          const otherB = b.interfaces.filter(i => i.ip && i !== ib).map(i => `${i.name}=${i.ip}`).join(', ');
+          const faceA = ia ? ia.name : '?';
+          const faceB = ib ? ib.name : '?';
+          let detail = `Configure o IP na interface do cabo (${a.label} ${faceA} e ${b.label} ${faceB}), ex.: 10.0.0.1 e 10.0.0.2 com 255.255.255.252.`;
+          if (otherA || otherB) {
+            detail += ` Há IP em outra interface (${[otherA && a.label + ': ' + otherA, otherB && b.label + ': ' + otherB].filter(Boolean).join('; ')}). Salve de novo para realinhar o cabo automaticamente.`;
+          }
           issues.push({
             level: 'warn',
-            msg: `Enlace ${a.label} ↔ ${b.label}: configure IPs nas interfaces do enlace entre roteadores.`,
+            msg: `Enlace ${a.label} ↔ ${b.label}: ${detail}`,
             devices: [a.id, b.id]
           });
         }
@@ -2584,6 +2635,9 @@
 
   function runValidation(logIssues = false) {
     const issues = validateTopology();
+    // rebindP2PLinks pode ter movido o cabo de Gi0/0 → Gi0/1; atualiza painel
+    const sel = state.selectedId ? getDevice(state.selectedId) : null;
+    if (sel?.type === 'router') renderProperties();
     renderValidation(issues, { logIssues });
     return issues;
   }
@@ -2973,6 +3027,96 @@
     ) || null;
   }
 
+  /**
+   * Escolhe interface livre do roteador para um novo cabo.
+   * Prefere interface que já tem IP na mesma sub-rede do vizinho (ex.: /30 WAN em Gi0/1).
+   */
+  function pickRouterIface(router, peer) {
+    if (!router?.interfaces) return null;
+    const free = router.interfaces.filter(i => !i.linkId);
+    if (!free.length) return null;
+
+    if (peer?.type === 'router' && peer.interfaces) {
+      const peerIfaces = peer.interfaces.filter(i => i.ip);
+      for (const iface of free) {
+        if (!iface.ip) continue;
+        for (const p of peerIfaces) {
+          if (isSameNetwork(
+            { ip: iface.ip, mask: iface.mask },
+            { ip: p.ip, mask: p.mask }
+          )) {
+            return iface;
+          }
+        }
+      }
+    }
+
+    // Prefere interface já com IP (usuário configurou Gi0/1 antes de conectar)
+    const withIp = free.find(i => i.ip);
+    return withIp || free[0];
+  }
+
+  /**
+   * Reassocia o cabo R↔R à interface que realmente tem o IP do enlace.
+   * Corrige o caso clássico: cabo em Gi0/0 (vazia) e IP /30 em Gi0/1.
+   */
+  function rebindP2PLinks() {
+    state.links.forEach(link => {
+      const a = getDevice(link.from);
+      const b = getDevice(link.to);
+      if (!a || !b || a.type !== 'router' || b.type !== 'router') return;
+
+      const curA = a.interfaces.find(i => i.linkId === link.id) || null;
+      const curB = b.interfaces.find(i => i.linkId === link.id) || null;
+
+      if (curA?.ip && curB?.ip && isSameNetwork(
+        { ip: curA.ip, mask: curA.mask },
+        { ip: curB.ip, mask: curB.mask }
+      )) {
+        return; // já correto
+      }
+
+      const candsA = a.interfaces.filter(i => !i.linkId || i.linkId === link.id);
+      const candsB = b.interfaces.filter(i => !i.linkId || i.linkId === link.id);
+
+      let best = null;
+      for (const ia of candsA) {
+        if (!ia.ip) continue;
+        for (const ib of candsB) {
+          if (!ib.ip) continue;
+          if (isSameNetwork(
+            { ip: ia.ip, mask: ia.mask },
+            { ip: ib.ip, mask: ib.mask }
+          )) {
+            best = { ia, ib };
+            break;
+          }
+        }
+        if (best) break;
+      }
+
+      if (best) {
+        if (curA && curA !== best.ia) curA.linkId = null;
+        if (curB && curB !== best.ib) curB.linkId = null;
+        best.ia.linkId = link.id;
+        best.ib.linkId = link.id;
+        return;
+      }
+
+      // Só um lado com IP na interface "certa": move o cabo para a iface com IP
+      const withIpA = candsA.find(i => i.ip);
+      const withIpB = candsB.find(i => i.ip);
+      if (withIpA && curA && withIpA !== curA && !curA.ip) {
+        curA.linkId = null;
+        withIpA.linkId = link.id;
+      }
+      if (withIpB && curB && withIpB !== curB && !curB.ip) {
+        curB.linkId = null;
+        withIpB.linkId = link.id;
+      }
+    });
+  }
+
   function getLinkEndpoints(link) {
     const a = getDevice(link.from);
     const b = getDevice(link.to);
@@ -3126,14 +3270,14 @@
 
     let iface1 = null, iface2 = null;
     if (d1.type === 'router') {
-      iface1 = d1.interfaces.find(i => !i.linkId);
+      iface1 = pickRouterIface(d1, d2);
       if (!iface1) {
         log(`${d1.label} não possui interfaces livres.`, 'err');
         return;
       }
     }
     if (d2.type === 'router') {
-      iface2 = d2.interfaces.find(i => !i.linkId);
+      iface2 = pickRouterIface(d2, d1);
       if (!iface2) {
         log(`${d2.label} não possui interfaces livres.`, 'err');
         return;
@@ -3143,8 +3287,24 @@
     state.links.push({ id: linkId, from: d1.id, to: d2.id });
     if (iface1) iface1.linkId = linkId;
     if (iface2) iface2.linkId = linkId;
+    // Se IPs /30 já estavam em outras interfaces, alinha o cabo com elas
+    rebindP2PLinks();
     updateLinks();
-    log(`Cabo conectado: ${d1.label} ↔ ${d2.label}`, 'ok');
+    const faceHint = [];
+    if (iface1) {
+      const ia = d1.interfaces.find(i => i.linkId === linkId);
+      if (ia) faceHint.push(`${d1.label} ${ia.name}`);
+    }
+    if (iface2) {
+      const ib = d2.interfaces.find(i => i.linkId === linkId);
+      if (ib) faceHint.push(`${d2.label} ${ib.name}`);
+    }
+    log(
+      faceHint.length
+        ? `Cabo conectado: ${d1.label} ↔ ${d2.label} (${faceHint.join(' — ')})`
+        : `Cabo conectado: ${d1.label} ↔ ${d2.label}`,
+      'ok'
+    );
     if (state.selectedId === d1.id || state.selectedId === d2.id) renderProperties();
     markDirty();
   }
@@ -3550,17 +3710,33 @@
       html += `<div id="prop-errors" class="prop-error"></div>`;
     } else if (dev.type === 'router') {
       html += `<h4>Interfaces do Roteador</h4>`;
+      html += `<p class="hint">Enlace entre roteadores: coloque o IP na interface <strong>conectada</strong> ao outro roteador (ex.: 10.0.0.1 e 10.0.0.2 com máscara <code>255.255.255.252</code> ou <code>/30</code>).</p>`;
       dev.interfaces.forEach((iface, i) => {
-        const status = iface.linkId ? 'conectada' : 'livre';
-        const statusCls = iface.linkId ? 'connected' : '';
+        let status = 'livre';
+        let statusCls = '';
+        let placeholderIp = '192.168.1.1';
+        if (iface.linkId) {
+          const link = state.links.find(l => l.id === iface.linkId);
+          const peerId = link ? (link.from === dev.id ? link.to : link.from) : null;
+          const peer = peerId ? getDevice(peerId) : null;
+          if (peer?.type === 'router') {
+            status = `conectada → ${peer.label} (WAN /30)`;
+            placeholderIp = '10.0.0.1';
+          } else if (peer) {
+            status = `conectada → ${peer.label}`;
+          } else {
+            status = 'conectada';
+          }
+          statusCls = 'connected';
+        }
         html += `
           <div class="iface-box">
             <strong>${iface.name}</strong>
             <span class="iface-status ${statusCls}"> — ${status}</span>
             <label>IP</label>
-            <input type="text" class="iface-ip" data-idx="${i}" value="${iface.ip}" placeholder="192.168.1.1">
+            <input type="text" class="iface-ip" data-idx="${i}" value="${iface.ip}" placeholder="${placeholderIp}">
             <label>Máscara</label>
-            <input type="text" class="iface-mask" data-idx="${i}" value="${iface.mask}" placeholder="255.255.255.0">
+            <input type="text" class="iface-mask" data-idx="${i}" value="${iface.mask}" placeholder="255.255.255.0 ou /30">
           </div>`;
       });
       // tabela de rotas
@@ -3698,10 +3874,14 @@
         }
         dev.ipMode = 'static';
         const ip = document.getElementById('prop-ip').value.trim();
-        const mask = document.getElementById('prop-mask').value.trim() || '255.255.255.0';
+        const rawMask = document.getElementById('prop-mask').value.trim() || '255.255.255.0';
+        const mask = normalizeMask(rawMask) || rawMask;
         const gw = document.getElementById('prop-gw').value.trim();
         const dns = document.getElementById('prop-dns')?.value.trim() || '';
 
+        if (rawMask && !normalizeMask(rawMask)) {
+          localErrors.push('Máscara inválida. Use 255.255.255.0 ou /24.');
+        }
         validateIpAssignment(ip, mask, dev.label).forEach(i => localErrors.push(i.msg));
 
         if (ip && gw) {
@@ -3810,28 +3990,43 @@
       const draft = dev.interfaces.map((iface, i) => {
         const ipEl = document.querySelector(`.iface-ip[data-idx="${i}"]`);
         const maskEl = document.querySelector(`.iface-mask[data-idx="${i}"]`);
+        const rawMask = maskEl ? maskEl.value.trim() : (iface.mask || '');
+        const normMask = rawMask ? normalizeMask(rawMask) : null;
         return {
           ...iface,
           ip: ipEl ? ipEl.value.trim() : iface.ip,
-          mask: maskEl ? (maskEl.value.trim() || '255.255.255.0') : iface.mask
+          // vazio → default /24; se preenchido, normaliza (/30 → 255.255.255.252)
+          mask: rawMask ? (normMask || rawMask) : '255.255.255.0',
+          _maskInvalid: !!(rawMask && !normMask)
         };
       });
 
       draft.forEach(iface => {
         if (!iface.ip) return;
+        if (iface._maskInvalid) {
+          localErrors.push(
+            `${dev.label} ${iface.name}: máscara inválida. Use 255.255.255.252 ou /30 (enlace entre roteadores).`
+          );
+          return;
+        }
         validateIpAssignment(iface.ip, iface.mask, `${dev.label} ${iface.name}`).forEach(i => {
           localErrors.push(i.msg);
         });
       });
 
-      // redes distintas entre interfaces
+      // redes distintas entre interfaces do mesmo roteador
       for (let i = 0; i < draft.length; i++) {
         for (let j = i + 1; j < draft.length; j++) {
           const a = draft[i], b = draft[j];
           if (!a.ip || !b.ip) continue;
+          const na = getNetworkAddr(a.ip, a.mask);
+          const nbOnA = getNetworkAddr(b.ip, a.mask);
+          const nb = getNetworkAddr(b.ip, b.mask);
+          const naOnB = getNetworkAddr(a.ip, b.mask);
+          // importa: null === null NÃO conta como mesma rede (máscara inválida)
           const same =
-            getNetworkAddr(a.ip, a.mask) === getNetworkAddr(b.ip, a.mask) ||
-            getNetworkAddr(a.ip, b.mask) === getNetworkAddr(b.ip, b.mask);
+            (na !== null && nbOnA !== null && na === nbOnA) ||
+            (nb !== null && naOnB !== null && nb === naOnB);
           if (same) {
             localErrors.push(`As interfaces ${a.name} e ${b.name} pertencem à mesma rede.`);
           }
@@ -3862,6 +4057,9 @@
         dev.interfaces[i].ip = iface.ip;
         dev.interfaces[i].mask = iface.mask;
       });
+
+      // Cabo estava em Gi0/0 e IP /30 em Gi0/1? Move o cabo para a interface certa.
+      rebindP2PLinks();
     }
 
     updateDeviceIpLabel(dev);
