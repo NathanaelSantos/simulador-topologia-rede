@@ -153,6 +153,12 @@
       color: #64748b;
     }
     .iface-status.connected { color: #059669; }
+    .iface-status.need-ip { color: #d97706; font-weight: 600; }
+    .iface-status.orphan { color: #dc2626; }
+    .iface-box.need-ip {
+      border-color: #fbbf24;
+      background: #fffbeb;
+    }
     .sidebar-splitter {
       flex: 0 0 6px;
       height: 6px;
@@ -399,6 +405,72 @@
       opacity: 0.9;
       margin-top: 2px;
     }
+    /* Regiões (círculos coloridos — só visual, não afetam rede) */
+    .region {
+      position: absolute;
+      border-radius: 50%;
+      z-index: 0;
+      pointer-events: auto;
+      cursor: grab;
+      box-sizing: border-box;
+      border: 2px dashed transparent;
+      display: flex;
+      align-items: flex-start;
+      justify-content: center;
+      padding-top: 12px;
+      user-select: none;
+      transition: box-shadow 0.15s, border-color 0.15s;
+    }
+    .region:active { cursor: grabbing; }
+    .region.selected {
+      border-color: rgba(15, 23, 42, 0.5);
+      box-shadow: 0 0 0 3px rgba(59, 130, 246, 0.28), 0 8px 24px rgba(15, 23, 42, 0.12);
+    }
+    .region-label {
+      font-size: 0.8rem;
+      font-weight: 700;
+      letter-spacing: 0.02em;
+      text-shadow: 0 1px 2px rgba(255,255,255,0.85);
+      max-width: 85%;
+      text-align: center;
+      pointer-events: none;
+      line-height: 1.2;
+    }
+    .region-resize {
+      position: absolute;
+      right: 10%;
+      bottom: 10%;
+      width: 16px;
+      height: 16px;
+      border-radius: 50%;
+      background: #fff;
+      border: 2px solid #334155;
+      cursor: nwse-resize;
+      box-shadow: 0 1px 4px rgba(15, 23, 42, 0.2);
+      z-index: 2;
+      padding: 0;
+    }
+    .region-resize:hover { background: #eff6ff; border-color: #2563eb; }
+    .region-color-swatches {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 6px;
+      margin-top: 8px;
+    }
+    .region-swatch {
+      width: 28px;
+      height: 28px;
+      border-radius: 50%;
+      border: 2px solid #fff;
+      box-shadow: 0 0 0 1px #cbd5e1;
+      cursor: pointer;
+      padding: 0;
+    }
+    .region-swatch.active {
+      box-shadow: 0 0 0 2px #1d4ed8;
+      transform: scale(1.08);
+    }
+
     #connections {
       position: absolute;
       top: 0; left: 0;
@@ -500,6 +572,20 @@
       background: transparent;
       box-shadow: none;
       border: none;
+    }
+    /* Nuvem ISP — backbone da Internet didática */
+    .isp .device-icon {
+      background: linear-gradient(145deg, #0ea5e9, #6366f1);
+      box-shadow: 0 4px 14px rgba(14, 165, 233, 0.35);
+      border: 1px solid #38bdf8;
+      border-radius: 50% 50% 45% 45%;
+      font-size: 1.6rem;
+      line-height: 1;
+    }
+    .isp .device-ip {
+      max-width: 140px;
+      font-size: 0.65rem;
+      color: #0369a1;
     }
     /* Servidor DHCP (imgs/data-storage.png tem fundo preto) */
     .dhcp .device-icon {
@@ -835,7 +921,9 @@
     <button id="btn-host">+ Host</button>
     <button id="btn-switch">+ Switch</button>
     <button id="btn-router">+ Roteador</button>
+    <button id="btn-isp" title="ISP / Nuvem Internet — interliga redes de clientes via WAN">+ ISP</button>
     <button id="btn-dhcp" title="Servidor DHCP — distribuição automática de IPs">+ DHCP</button>
+    <button id="btn-region" class="secondary" title="Círculo colorido só para marcar regiões (não afeta a rede)">+ Região</button>
     <div class="toolbar-sep"></div>
     <button id="btn-connect" class="secondary" title="Ativa o modo de ligação entre dispositivos">🔌 Modo Conectar</button>
     <button id="btn-select-all" class="secondary" title="Seleciona todos os dispositivos (Ctrl+A)">▣ Selecionar tudo</button>
@@ -856,7 +944,7 @@
     <div class="sidebar" id="sidebar">
       <div class="properties" id="properties">
         <p style="color:#64748b;font-size:0.85rem;">Selecione um dispositivo para configurar endereçamento IP, máscara e gateway.</p>
-        <p class="hint">Dica: hosts (estático ou DHCP), servidor DHCP (escopo/range/lease), roteadores (interfaces) e switches (L2).</p>
+        <p class="hint">Dica: hosts (estático ou DHCP), servidor DHCP, roteadores, <strong>ISP (nuvem Internet)</strong> e switches (L2).</p>
       </div>
 
       <div class="sidebar-splitter" id="split-props-log" title="Arraste para redimensionar" role="separator" aria-orientation="horizontal"></div>
@@ -950,9 +1038,74 @@
   const CABLE_RULES = {
     host:   new Set(['switch', 'router']),
     switch: new Set(['host', 'switch', 'router', 'dhcp']),
-    router: new Set(['host', 'switch', 'router', 'dhcp']),
-    dhcp:   new Set(['switch', 'router'])
+    router: new Set(['host', 'switch', 'router', 'dhcp', 'isp']),
+    dhcp:   new Set(['switch', 'router']),
+    // ISP ↔ roteador (cliente) e ISP ↔ ISP (peering entre provedores)
+    isp:    new Set(['router', 'isp'])
   };
+
+  /** Roteador ou ISP: equipamentos de camada 3 com interfaces IP */
+  function isL3Device(d) {
+    return !!(d && (d.type === 'router' || d.type === 'isp'));
+  }
+
+  const ISP_INITIAL_PE = 8;
+  const ISP_MAX_PE = 32; // teto didático (clientes + peering)
+
+  /** Interfaces PE iniciais de um ISP (expandem sob demanda) */
+  function defaultIspInterfaces() {
+    return Array.from({ length: ISP_INITIAL_PE }, (_, i) => ({
+      name: `PE0/${i}`,
+      ip: '',
+      mask: '255.255.255.252',
+      linkId: null
+    }));
+  }
+
+  /** Libera linkId de interfaces apontando para cabos que não existem mais */
+  function cleanupOrphanLinkIds(dev) {
+    const valid = new Set(state.links.map(l => l.id));
+    const list = dev ? [dev] : state.devices;
+    list.forEach(d => {
+      if (!d.interfaces) return;
+      d.interfaces.forEach(i => {
+        if (i.linkId && !valid.has(i.linkId)) {
+          i.linkId = null;
+        }
+      });
+    });
+  }
+
+  /**
+   * Garante uma PE livre no ISP. Se as 8 (ou mais) estiverem em uso,
+   * cria PE0/8, PE0/9… até ISP_MAX_PE (lab: 7 clientes + peering, etc.).
+   */
+  function ensureIspFreeIface(isp) {
+    if (!isp || isp.type !== 'isp') return null;
+    if (!Array.isArray(isp.interfaces) || !isp.interfaces.length) {
+      isp.interfaces = defaultIspInterfaces();
+    }
+    cleanupOrphanLinkIds(isp);
+    let free = isp.interfaces.find(i => !i.linkId);
+    if (free) return free;
+
+    if (isp.interfaces.length >= ISP_MAX_PE) {
+      return null;
+    }
+    const idx = isp.interfaces.length;
+    const iface = {
+      name: `PE0/${idx}`,
+      ip: '',
+      mask: '255.255.255.252',
+      linkId: null
+    };
+    isp.interfaces.push(iface);
+    log(
+      `${isp.label}: porta ${iface.name} criada automaticamente (${idx + 1}/${ISP_MAX_PE}). As 8 iniciais não bastavam (clientes + peering).`,
+      'info'
+    );
+    return iface;
+  }
 
   const DEFAULT_LEASE_SEC = 3600;
   const MIN_LEASE_SEC = 20; // permite lease curto na aula (T1 = metade → animação de renovação)
@@ -960,9 +1113,11 @@
   const state = {
     devices: [],
     links: [],
+    regions: [],
     selectedId: null,
     selectedIds: [],
     selectedLinkId: null,
+    selectedRegionId: null,
     mode: 'select',
     connectFrom: null,
     nextId: 1,
@@ -975,6 +1130,21 @@
     view: { zoom: 1, panX: 0, panY: 0 },
     spaceDown: false
   };
+
+  /** Paleta de cores para regiões didáticas */
+  const REGION_COLORS = [
+    { id: 'blue',   hex: '#3b82f6', name: 'Azul' },
+    { id: 'green',  hex: '#22c55e', name: 'Verde' },
+    { id: 'amber',  hex: '#f59e0b', name: 'Âmbar' },
+    { id: 'rose',   hex: '#f43f5e', name: 'Rosa' },
+    { id: 'violet', hex: '#8b5cf6', name: 'Violeta' },
+    { id: 'cyan',   hex: '#06b6d4', name: 'Ciano' },
+    { id: 'orange', hex: '#f97316', name: 'Laranja' },
+    { id: 'slate',  hex: '#64748b', name: 'Cinza' }
+  ];
+  const REGION_MIN_R = 120;
+  const REGION_MAX_R = 1400;
+  const REGION_DEFAULT_R = 360; // ~720px de diâmetro — cobre um site com vários dispositivos
 
   const VIEW_ZOOM_MIN = 0.25;
   const VIEW_ZOOM_MAX = 3;
@@ -1961,13 +2131,13 @@
       // se for roteador e não for o start, não expande além (mas o start router entra)
       for (const n of neighborsOf(id)) {
         if (members.has(n.id)) continue;
-        if (n.type === 'router' && id !== startId) {
-          // vizinho roteador: inclui a interface/roteador no domínio, mas não atravessa
+        if (isL3Device(n) && id !== startId) {
+          // vizinho L3 (roteador/ISP): inclui no domínio, mas não atravessa
           members.add(n.id);
           continue;
         }
-        if (dev.type === 'router' && n.type !== 'switch' && n.type !== 'host' && n.type !== 'dhcp' && n.id !== startId) {
-          // a partir do roteador, só inclui vizinhos diretos daquela "porta" no início
+        if (isL3Device(dev) && n.type !== 'switch' && n.type !== 'host' && n.type !== 'dhcp' && n.id !== startId) {
+          // a partir do L3, só inclui vizinhos diretos daquela "porta" no início
         }
         // Atravessa apenas através de switches (e inclui hosts/routers no domínio)
         if (n.type === 'switch') {
@@ -1996,13 +2166,13 @@
         if (members.has(n.id)) continue;
         // Nunca atravessa roteador para outro lado
         const current = getDevice(id);
-        if (current.type === 'router') {
-          // do roteador só vemos vizinhos diretos já adicionados no start expansion
+        if (isL3Device(current)) {
+          // do L3 só vemos vizinhos diretos já adicionados no start expansion
           continue;
         }
-        if (n.type === 'router') {
+        if (isL3Device(n)) {
           members.add(n.id);
-          // não entra na fila — não cruza o roteador
+          // não entra na fila — não cruza roteador/ISP
           continue;
         }
         members.add(n.id);
@@ -2038,7 +2208,7 @@
           kind: 'dhcp'
         });
       }
-      if (d.type === 'router' && d.interfaces) {
+      if (isL3Device(d) && d.interfaces) {
         d.interfaces.forEach(iface => {
           if (iface.ip) {
             list.push({
@@ -2058,8 +2228,16 @@
   }
 
   function findRouterByIp(ip) {
+    // Gateway de LAN costuma ser o roteador do cliente (não o ISP)
     return state.devices.find(d =>
       d.type === 'router' && d.interfaces.some(i => i.ip === ip)
+    );
+  }
+
+  /** Qualquer dispositivo L3 (roteador ou ISP) com esse IP em interface */
+  function findL3ByIp(ip) {
+    return state.devices.find(d =>
+      isL3Device(d) && d.interfaces?.some(i => i.ip === ip)
     );
   }
 
@@ -2090,7 +2268,8 @@
   /**
    * Tabela de rotas simplificada:
    * - redes diretas
-   * - redes aprendidas via roteadores adjacentes (BFS, como "redes conectadas" + vizinhança)
+   * - redes aprendidas via vizinhos L3 (roteadores e ISP) em BFS
+   * O ISP atua como backbone: sites clientes enxergam as redes uns dos outros via a nuvem.
    */
   function buildRoutingTable(router) {
     const routes = new Map(); // netKey -> route
@@ -2098,14 +2277,14 @@
       routes.set(r.key, r);
     });
 
-    // BFS por roteadores adjacentes
+    // BFS por equipamentos L3 adjacentes (roteador ↔ ISP ↔ roteador)
     const visited = new Set([router.id]);
     const queue = [{ id: router.id, via: null, hop: 0 }];
 
     while (queue.length) {
       const { id, via, hop } = queue.shift();
       const r = getDevice(id);
-      if (!r || r.type !== 'router') continue;
+      if (!r || !isL3Device(r)) continue;
 
       getDirectNetworks(r).forEach(net => {
         if (!routes.has(net.key)) {
@@ -2118,11 +2297,9 @@
         }
       });
 
-      // vizinhos roteadores
       neighborsOf(id).forEach(n => {
-        if (n.type === 'router' && !visited.has(n.id)) {
+        if (isL3Device(n) && !visited.has(n.id)) {
           visited.add(n.id);
-          const viaLabel = hop === 0 ? n.label : (via || r.label);
           queue.push({ id: n.id, via: hop === 0 ? n.label : via, hop: hop + 1 });
         }
       });
@@ -2153,7 +2330,7 @@
     if (!allowed || !allowed.has(d2.type)) {
       return {
         ok: false,
-        msg: `Cabo inválido: ${d1.type} → ${d2.type} não é permitido. Use Host↔Switch, DHCP↔Switch, Switch↔Roteador, Switch↔Switch ou Roteador↔Roteador.`
+        msg: `Cabo inválido: ${d1.type} → ${d2.type} não é permitido. Use Host↔Switch, DHCP↔Switch, Switch↔Roteador, Switch↔Switch, Roteador↔Roteador, Roteador↔ISP ou ISP↔ISP (peering).`
       };
     }
     // Host ↔ Host proibido explicitamente
@@ -2310,11 +2487,11 @@
       }
     });
 
-    // --- 1.2 Gateway único por rede (somente LANs reais, não enlace R↔R) ---
-    // Em /30 ou /31 entre roteadores é NORMAL haver 2 IPs na mesma rede (ponto a ponto).
+    // --- 1.2 Gateway único por rede (somente LANs reais, não enlace R↔R / R↔ISP) ---
+    // Em /30 ou /31 entre L3 é NORMAL haver 2 IPs na mesma rede (ponto a ponto).
     // Só avisa quando a rede parece uma LAN (há host) ou quando 2+ gateways não são p2p.
     const routersOnNet = {}; // netKey -> [{router, iface}]
-    state.devices.filter(d => d.type === 'router').forEach(r => {
+    state.devices.filter(d => isL3Device(d)).forEach(r => {
       r.interfaces.forEach(iface => {
         if (!iface.ip) return;
         const nk = netKey(iface.ip, iface.mask || '255.255.255.0');
@@ -2415,8 +2592,8 @@
       });
     });
 
-    // --- 3. Interfaces do roteador em redes diferentes ---
-    state.devices.filter(d => d.type === 'router').forEach(r => {
+    // --- 3. Interfaces L3 (roteador/ISP) em redes diferentes ---
+    state.devices.filter(d => isL3Device(d)).forEach(r => {
       const ifaces = r.interfaces.filter(i => i.ip);
       for (let i = 0; i < ifaces.length; i++) {
         for (let j = i + 1; j < ifaces.length; j++) {
@@ -2439,14 +2616,19 @@
       }
     });
 
-    // --- 4. Enlace entre roteadores deve ser rede exclusiva ---
+    // --- 4. Enlace L3↔L3 (R↔R ou R↔ISP) deve ser rede exclusiva ---
     state.links.forEach(l => {
       const a = getDevice(l.from);
       const b = getDevice(l.to);
       if (!a || !b) return;
-      if (a.type === 'router' && b.type === 'router') {
+      if (isL3Device(a) && isL3Device(b)) {
         const ia = a.interfaces.find(i => i.linkId === l.id);
         const ib = b.interfaces.find(i => i.linkId === l.id);
+        const isIspPeering = a.type === 'isp' && b.type === 'isp';
+        const isIspClient = (a.type === 'isp' || b.type === 'isp') && !isIspPeering;
+        const linkKind = isIspPeering
+          ? 'peering ISP↔ISP'
+          : (isIspClient ? 'WAN cliente↔ISP' : 'enlace entre roteadores');
         if (ia?.ip && ib?.ip) {
           // devem estar na mesma rede entre si
           if (!isSameNetwork(
@@ -2455,7 +2637,7 @@
           )) {
             issues.push({
               level: 'err',
-              msg: `Enlace ${a.label} ↔ ${b.label}: ${ia.name}=${ia.ip}/${maskToPrefix(ia.mask) ?? '?'} e ${ib.name}=${ib.ip}/${maskToPrefix(ib.mask) ?? '?'} não estão na mesma sub-rede. Exemplo válido: 10.0.0.1 e 10.0.0.2 com máscara 255.255.255.252 (/30).`,
+              msg: `${linkKind} ${a.label} ↔ ${b.label}: ${ia.name}=${ia.ip}/${maskToPrefix(ia.mask) ?? '?'} e ${ib.name}=${ib.ip}/${maskToPrefix(ib.mask) ?? '?'} não estão na mesma sub-rede. Exemplo válido: 200.0.0.1 e 200.0.0.2 com máscara 255.255.255.252 (/30).`,
               devices: [a.id, b.id]
             });
           }
@@ -2463,14 +2645,14 @@
           // rede do enlace não deve aparecer em LANs (hosts ou outras ifaces)
           endpoints.forEach(ep => {
             if (ep.deviceId === a.id || ep.deviceId === b.id) {
-              // mesma interface do enlace ok; outras ifaces do mesmo router já cobertas pela regra 3
+              // mesma interface do enlace ok; outras ifaces do mesmo L3 já cobertas pela regra 3
               if (ep.kind === 'iface' && (ep.ip === ia.ip || ep.ip === ib.ip)) return;
             }
             const epNet = netKey(ep.ip, ep.mask);
             if (linkNet && epNet && linkNet === epNet && ep.deviceId !== a.id && ep.deviceId !== b.id) {
               issues.push({
                 level: 'err',
-                msg: `O enlace entre roteadores (${a.label} ↔ ${b.label}) deve utilizar uma rede exclusiva. A rede ${linkNet} também é usada por ${ep.label}.`,
+                msg: `O ${linkKind} (${a.label} ↔ ${b.label}) deve utilizar uma rede exclusiva. A rede ${linkNet} também é usada por ${ep.label}.`,
                 devices: [a.id, b.id, ep.deviceId]
               });
             }
@@ -2482,7 +2664,7 @@
               if (!already) {
                 issues.push({
                   level: 'err',
-                  msg: `O enlace entre roteadores deve utilizar uma rede exclusiva. A rede ${linkNet} também é usada por ${ep.label}.`,
+                  msg: `O ${linkKind} deve utilizar uma rede exclusiva. A rede ${linkNet} também é usada por ${ep.label}.`,
                   devices: [a.id, b.id, ep.deviceId]
                 });
               }
@@ -2493,7 +2675,7 @@
           if (p !== null && p < 30) {
             issues.push({
               level: 'warn',
-              msg: `Enlace ${a.label} ↔ ${b.label}: recomenda-se máscara /30 ou /31 (atual: /${p}).`,
+              msg: `${linkKind} ${a.label} ↔ ${b.label}: recomenda-se máscara /30 ou /31 (atual: /${p}).`,
               devices: [a.id, b.id]
             });
           }
@@ -2503,13 +2685,24 @@
           const otherB = b.interfaces.filter(i => i.ip && i !== ib).map(i => `${i.name}=${i.ip}`).join(', ');
           const faceA = ia ? ia.name : '?';
           const faceB = ib ? ib.name : '?';
-          let detail = `Configure o IP na interface do cabo (${a.label} ${faceA} e ${b.label} ${faceB}), ex.: 10.0.0.1 e 10.0.0.2 com 255.255.255.252.`;
+          const example = isIspPeering
+            ? '200.0.0.1 e 200.0.0.2 (peering) com 255.255.255.252'
+            : (isIspClient
+              ? '200.0.0.1 (ISP) e 200.0.0.2 (roteador) com 255.255.255.252'
+              : '10.0.0.1 e 10.0.0.2 com 255.255.255.252');
+          let detail = `Configure o IP na interface do cabo (${a.label} ${faceA} e ${b.label} ${faceB}), ex.: ${example}.`;
+          if (isIspClient) {
+            detail += ' Configure IP e máscara nas duas pontas e Salvar (lab manual).';
+          }
+          if (isIspPeering) {
+            detail += ' Configure o peering nas PEs dos dois ISPs (mesma sub-rede) e Salvar.';
+          }
           if (otherA || otherB) {
             detail += ` Há IP em outra interface (${[otherA && a.label + ': ' + otherA, otherB && b.label + ': ' + otherB].filter(Boolean).join('; ')}). Salve de novo para realinhar o cabo automaticamente.`;
           }
           issues.push({
             level: 'warn',
-            msg: `Enlace ${a.label} ↔ ${b.label}: ${detail}`,
+            msg: `${linkKind} ${a.label} ↔ ${b.label}: ${detail}`,
             devices: [a.id, b.id]
           });
         }
@@ -2637,7 +2830,7 @@
     const issues = validateTopology();
     // rebindP2PLinks pode ter movido o cabo de Gi0/0 → Gi0/1; atualiza painel
     const sel = state.selectedId ? getDevice(state.selectedId) : null;
-    if (sel?.type === 'router') renderProperties();
+    if (sel && isL3Device(sel)) renderProperties();
     renderValidation(issues, { logIssues });
     return issues;
   }
@@ -2792,7 +2985,15 @@
           linkId: i.linkId
         })) : null
       })),
-      links: state.links.map(l => ({ id: l.id, from: l.from, to: l.to }))
+      links: state.links.map(l => ({ id: l.id, from: l.from, to: l.to })),
+      regions: (state.regions || []).map(r => ({
+        id: r.id,
+        label: r.label,
+        x: r.x,
+        y: r.y,
+        radius: r.radius,
+        color: r.color
+      }))
     };
   }
 
@@ -2811,6 +3012,7 @@
 
   function clearCanvasDevices() {
     document.querySelectorAll('.device').forEach(el => el.remove());
+    document.querySelectorAll('.region').forEach(el => el.remove());
   }
 
   function applyTopology(data) {
@@ -2846,19 +3048,206 @@
         base.mask = d.mask || '255.255.255.0';
         base.ipMode = d.ipMode === 'dhcp' ? 'dhcp' : 'static';
       }
+      if (d.type === 'isp') {
+        base.interfaces = d.interfaces && d.interfaces.length
+          ? d.interfaces.map(i => ({ ...i }))
+          : defaultIspInterfaces();
+      }
+      if (d.type === 'router' && !base.interfaces) {
+        base.interfaces = [
+          { name: 'Gi0/0', ip: '', mask: '255.255.255.0', linkId: null },
+          { name: 'Gi0/1', ip: '', mask: '255.255.255.0', linkId: null },
+          { name: 'Gi0/2', ip: '', mask: '255.255.255.0', linkId: null },
+          { name: 'Gi0/3', ip: '', mask: '255.255.255.0', linkId: null }
+        ];
+      }
       return base;
     });
     state.links = data.links.map(l => ({ id: l.id, from: l.from, to: l.to }));
-    state.nextId = data.nextId || (state.devices.length + state.links.length + 1);
+    state.regions = Array.isArray(data.regions)
+      ? data.regions.map(r => ({
+          id: r.id,
+          label: r.label || 'Região',
+          x: typeof r.x === 'number' ? r.x : 280,
+          y: typeof r.y === 'number' ? r.y : 220,
+          radius: Math.max(REGION_MIN_R, Math.min(REGION_MAX_R, r.radius || REGION_DEFAULT_R)),
+          color: r.color || REGION_COLORS[0].hex
+        }))
+      : [];
+    state.nextId = data.nextId || (state.devices.length + state.links.length + state.regions.length + 1);
     state.selectedId = null;
     state.selectedIds = [];
+    state.selectedRegionId = null;
     setMode('select');
 
     state.devices.forEach(renderDevice);
+    renderAllRegions();
     updateLinks();
     renderProperties();
     updateSelectionUI();
     runValidation(false);
+  }
+
+  // ========== REGIÕES (círculos coloridos — só visual) ==========
+  function getRegion(id) {
+    return state.regions.find(r => r.id === id) || null;
+  }
+
+  function hexToRgba(hex, alpha) {
+    const h = (hex || '#3b82f6').replace('#', '');
+    const full = h.length === 3 ? h.split('').map(c => c + c).join('') : h;
+    const n = parseInt(full, 16);
+    if (Number.isNaN(n)) return `rgba(59,130,246,${alpha})`;
+    const r = (n >> 16) & 255;
+    const g = (n >> 8) & 255;
+    const b = n & 255;
+    return `rgba(${r},${g},${b},${alpha})`;
+  }
+
+  function createRegion() {
+    const id = 'reg' + state.nextId++;
+    const count = state.regions.length + 1;
+    const color = REGION_COLORS[(count - 1) % REGION_COLORS.length].hex;
+    const region = {
+      id,
+      label: 'Região ' + count,
+      x: 220 + (count % 4) * 40,
+      y: 180 + (count % 3) * 30,
+      radius: REGION_DEFAULT_R,
+      color
+    };
+    state.regions.push(region);
+    renderRegion(region);
+    selectRegion(id);
+    log(`Região "${region.label}" adicionada (só visual — não afeta cabos nem rotas). Arraste, redimensione e escolha a cor.`, 'action');
+    markDirty();
+  }
+
+  function renderAllRegions() {
+    document.querySelectorAll('.region').forEach(el => el.remove());
+    state.regions.forEach(renderRegion);
+    updateRegionSelectionUI();
+  }
+
+  function updateRegionPosition(region) {
+    const el = document.getElementById(region.id);
+    if (!el) return;
+    const d = region.radius * 2;
+    el.style.left = (region.x - region.radius) + 'px';
+    el.style.top = (region.y - region.radius) + 'px';
+    el.style.width = d + 'px';
+    el.style.height = d + 'px';
+  }
+
+  function renderRegion(region) {
+    const old = document.getElementById(region.id);
+    if (old) old.remove();
+
+    const el = document.createElement('div');
+    el.className = 'region';
+    el.id = region.id;
+    el.dataset.regionId = region.id;
+    el.style.background = hexToRgba(region.color, 0.2);
+    el.style.boxShadow = `inset 0 0 0 2px ${hexToRgba(region.color, 0.55)}`;
+    el.innerHTML = `
+      <span class="region-label" style="color:${region.color}">${escapeHtml(region.label)}</span>
+      <button type="button" class="region-resize" title="Arraste para redimensionar" aria-label="Redimensionar"></button>
+    `;
+    updateRegionPosition(region);
+
+    el.addEventListener('mousedown', e => {
+      if (e.button !== 0) return;
+      if (e.target.classList.contains('region-resize')) return;
+      e.stopPropagation();
+      if (state.mode === 'connect') return;
+      selectRegion(region.id);
+      const world = screenToWorld(e.clientX, e.clientY);
+      state.dragging = {
+        type: 'region',
+        id: region.id,
+        startPos: { x: region.x, y: region.y },
+        startMouse: world,
+        moved: false
+      };
+      document.addEventListener('mousemove', onDrag);
+      document.addEventListener('mouseup', endDrag);
+    });
+
+    const handle = el.querySelector('.region-resize');
+    handle.addEventListener('mousedown', e => {
+      if (e.button !== 0) return;
+      e.stopPropagation();
+      e.preventDefault();
+      if (state.mode === 'connect') return;
+      selectRegion(region.id);
+      const world = screenToWorld(e.clientX, e.clientY);
+      state.dragging = {
+        type: 'region-resize',
+        id: region.id,
+        startRadius: region.radius,
+        startMouse: world,
+        center: { x: region.x, y: region.y },
+        moved: false
+      };
+      document.addEventListener('mousemove', onDrag);
+      document.addEventListener('mouseup', endDrag);
+    });
+
+    el.addEventListener('click', e => {
+      e.stopPropagation();
+      if (state.mode === 'connect') return;
+      selectRegion(region.id);
+    });
+
+    const worldEl = document.getElementById('world');
+    // atrás dos dispositivos e cabos
+    const svg = document.getElementById('connections');
+    if (svg && svg.parentNode === worldEl) {
+      worldEl.insertBefore(el, svg);
+    } else {
+      worldEl.appendChild(el);
+    }
+  }
+
+  function escapeHtml(s) {
+    return String(s ?? '')
+      .replace(/&/g, '&amp;')
+      .replace(/</g, '&lt;')
+      .replace(/>/g, '&gt;')
+      .replace(/"/g, '&quot;');
+  }
+
+  function selectRegion(id) {
+    state.selectedRegionId = id;
+    state.selectedId = null;
+    state.selectedIds = [];
+    state.selectedLinkId = null;
+    updateSelectionUI();
+    updateRegionSelectionUI();
+    updateLinks();
+    renderProperties();
+  }
+
+  function updateRegionSelectionUI() {
+    document.querySelectorAll('.region').forEach(el => {
+      el.classList.toggle('selected', el.id === state.selectedRegionId);
+    });
+  }
+
+  function deleteSelectedRegion() {
+    if (!state.selectedRegionId) return false;
+    const r = getRegion(state.selectedRegionId);
+    if (!r) {
+      state.selectedRegionId = null;
+      return false;
+    }
+    document.getElementById(r.id)?.remove();
+    state.regions = state.regions.filter(x => x.id !== r.id);
+    state.selectedRegionId = null;
+    log(`Região "${r.label}" removida.`, 'action');
+    markDirty();
+    renderProperties();
+    return true;
   }
 
   function loadTopology() {
@@ -2907,13 +3296,24 @@
   function createDevice(type) {
     const id = 'dev' + state.nextId++;
     const count = state.devices.filter(d => d.type === type).length + 1;
-    const labels = { host: 'Host', switch: 'SW', router: 'R', dhcp: 'DHCP' };
+    const labels = { host: 'Host', switch: 'SW', router: 'R', dhcp: 'DHCP', isp: 'ISP' };
+    let interfaces = null;
+    if (type === 'router') {
+      interfaces = [
+        { name: 'Gi0/0', ip: '', mask: '255.255.255.0', linkId: null },
+        { name: 'Gi0/1', ip: '', mask: '255.255.255.0', linkId: null },
+        { name: 'Gi0/2', ip: '', mask: '255.255.255.0', linkId: null },
+        { name: 'Gi0/3', ip: '', mask: '255.255.255.0', linkId: null }
+      ];
+    } else if (type === 'isp') {
+      interfaces = defaultIspInterfaces();
+    }
     const device = {
       id,
       type,
       x: 80 + Math.random() * 500,
       y: 60 + Math.random() * 350,
-      label: labels[type] + count,
+      label: labels[type] + (type === 'isp' && count === 1 ? '' : count),
       ip: (type === 'host' || type === 'dhcp') ? '' : undefined,
       mask: (type === 'host' || type === 'dhcp') ? '255.255.255.0' : undefined,
       gateway: type === 'host' ? '' : undefined,
@@ -2921,19 +3321,22 @@
       ipMode: type === 'host' ? 'static' : undefined,
       dhcpLease: type === 'host' ? null : undefined,
       dhcp: type === 'dhcp' ? defaultDhcpConfig() : null,
-      interfaces: type === 'router' ? [
-        { name: 'Gi0/0', ip: '', mask: '255.255.255.0', linkId: null },
-        { name: 'Gi0/1', ip: '', mask: '255.255.255.0', linkId: null },
-        { name: 'Gi0/2', ip: '', mask: '255.255.255.0', linkId: null },
-        { name: 'Gi0/3', ip: '', mask: '255.255.255.0', linkId: null }
-      ] : null
+      interfaces
     };
+    // rótulo ISP1, ISP2… (sem sufixo só se for o primeiro e label base "ISP")
+    if (type === 'isp') {
+      device.label = count === 1 ? 'ISP' : `ISP${count}`;
+    }
     state.devices.push(device);
     renderDevice(device);
     selectDevice(id);
     log(`Dispositivo ${device.label} adicionado.`, 'action');
     if (type === 'dhcp') {
       log('Configure o IP do servidor e o escopo DHCP (range, máscara, gateway, DNS e lease).', 'info');
+    }
+    if (type === 'isp') {
+      log('ISP (laboratório): ligue cabos e configure os IPs das portas PE manualmente (cliente ou peering).', 'info');
+      log('Regra: nos dois lados do cabo, mesma sub-rede (ex. 200.0.0.1 e 200.0.0.2 /30). Auto /30 é opcional no painel.', 'info');
     }
     markDirty();
     if (state.mode === 'connect') updateConnectUI();
@@ -2944,7 +3347,8 @@
     host: '🖥️',
     dhcp: '<img src="imgs/data-storage.png?v=3" alt="Servidor DHCP" width="56" height="56" draggable="false">',
     switch: '<img src="imgs/network-switch.png" alt="Switch" draggable="false">',
-    router: '<img src="imgs/roteador.png" alt="Roteador" draggable="false">'
+    router: '<img src="imgs/roteador.png" alt="Roteador" draggable="false">',
+    isp: '☁️'
   };
 
   function renderDevice(dev) {
@@ -3003,9 +3407,16 @@
       } else {
         el.textContent = cfg.enabled ? 'sem IP' : 'off';
       }
-    } else if (dev.type === 'router') {
-      const configured = dev.interfaces.filter(i => i.ip).map(i => i.ip);
-      el.textContent = configured.length ? configured.join(' | ') : '';
+    } else if (dev.type === 'router' || dev.type === 'isp') {
+      const configured = (dev.interfaces || []).filter(i => i.ip).map(i => i.ip);
+      if (dev.type === 'isp') {
+        const clients = (dev.interfaces || []).filter(i => i.linkId).length;
+        el.textContent = configured.length
+          ? `${configured.slice(0, 2).join(' | ')}${configured.length > 2 ? '…' : ''} · ${clients} cliente(s)`
+          : (clients ? `${clients} cliente(s) · sem IP WAN` : 'nuvem Internet');
+      } else {
+        el.textContent = configured.length ? configured.join(' | ') : '';
+      }
     } else {
       el.textContent = '';
     }
@@ -3028,15 +3439,25 @@
   }
 
   /**
-   * Escolhe interface livre do roteador para um novo cabo.
-   * Prefere interface que já tem IP na mesma sub-rede do vizinho (ex.: /30 WAN em Gi0/1).
+   * Escolhe interface livre do equipamento L3 (roteador/ISP) para um novo cabo.
+   * Prefere: (1) mesmo /30 do vizinho, (2) livre sem IP, (3) livre com IP.
+   * Em ISP, prioriza porta vazia para evitar reaproveitar IP órfão de outro enlace.
    */
   function pickRouterIface(router, peer) {
-    if (!router?.interfaces) return null;
+    if (!router) return null;
+
+    // ISP: limpa cabos fantasmas e expande PEs se necessário (7 clientes + 1 peering, etc.)
+    if (router.type === 'isp') {
+      const ensured = ensureIspFreeIface(router);
+      if (!ensured) return null;
+    }
+
+    if (!router.interfaces) return null;
+    cleanupOrphanLinkIds(router);
     const free = router.interfaces.filter(i => !i.linkId);
     if (!free.length) return null;
 
-    if (peer?.type === 'router' && peer.interfaces) {
+    if (isL3Device(peer) && peer.interfaces) {
       const peerIfaces = peer.interfaces.filter(i => i.ip);
       for (const iface of free) {
         if (!iface.ip) continue;
@@ -3051,20 +3472,239 @@
       }
     }
 
-    // Prefere interface já com IP (usuário configurou Gi0/1 antes de conectar)
+    // ISP: prefira PE sem IP (lab manual)
+    if (router.type === 'isp') {
+      const empty = free.find(i => !i.ip);
+      if (empty) return empty;
+    }
+
+    // Roteador: prefere interface já com IP (usuário configurou Gi0/1 antes de conectar)
     const withIp = free.find(i => i.ip);
     return withIp || free[0];
   }
 
   /**
-   * Reassocia o cabo R↔R à interface que realmente tem o IP do enlace.
+   * Encontra o próximo bloco /30 livre em 200.0.0.0/16 (IPs públicos didáticos do ISP).
+   * Retorna { network, peIp, ceIp, mask } ou null.
+   */
+  function nextFreePublicSlash30() {
+    const used = new Set(collectIpEndpoints().map(ep => ep.ip));
+    // 200.0.0.0/16 — blocos de 4 endereços: rede, PE (.1), CE (.2), broadcast
+    let base = ipToNumber('200.0.0.0');
+    const end = ipToNumber('200.0.255.252');
+    while (base <= end) {
+      const peIp = numberToIp(base + 1);
+      const ceIp = numberToIp(base + 2);
+      if (!used.has(peIp) && !used.has(ceIp) &&
+          !used.has(numberToIp(base)) && !used.has(numberToIp(base + 3))) {
+        return {
+          network: numberToIp(base),
+          peIp,
+          ceIp,
+          mask: '255.255.255.252'
+        };
+      }
+      base += 4;
+    }
+    return null;
+  }
+
+  /**
+   * Configura (ou completa) enlace /30 entre dois equipamentos L3 no cabo linkId.
+   * sideA recebe .1, sideB recebe .2. Usado em ISP↔cliente e ISP↔ISP (peering).
+   */
+  function sameSlash30Pair(ia, ib) {
+    if (!ia?.ip || !ib?.ip) return false;
+    const ma = ia.mask || '255.255.255.252';
+    const mb = ib.mask || '255.255.255.252';
+    return isSameNetwork({ ip: ia.ip, mask: ma }, { ip: ib.ip, mask: mb });
+  }
+
+  function autoConfigureP2POnLink(sideA, sideB, linkId, { force = false, kind = 'WAN' } = {}) {
+    if (!isL3Device(sideA) || !isL3Device(sideB)) {
+      return { ok: false, msg: 'Auto /30 só se aplica a equipamentos L3 (roteador/ISP).' };
+    }
+    const ia = sideA.interfaces?.find(i => i.linkId === linkId);
+    const ib = sideB.interfaces?.find(i => i.linkId === linkId);
+    if (!ia || !ib) {
+      return { ok: false, msg: 'Interfaces do enlace não encontradas.' };
+    }
+
+    // Só "já ok" se os dois IPs existem E estão na mesma sub-rede
+    if (!force && sameSlash30Pair(ia, ib)) {
+      return {
+        ok: true,
+        msg: `${kind} já configurada: ${sideA.label} ${ia.name}=${ia.ip} ↔ ${sideB.label} ${ib.name}=${ib.ip}`,
+        ia,
+        ib,
+        skipped: true
+      };
+    }
+
+    // IPs em sub-redes diferentes → sempre reatribui o par (corrige o erro de validação)
+    const mismatched = ia.ip && ib.ip && !sameSlash30Pair(ia, ib);
+    if (mismatched) {
+      force = true;
+    }
+
+    // Completa o outro lado se só um tem /30 (e o IP do par está livre)
+    if (!force && ia.ip && !ib.ip) {
+      const n = ipToNumber(ia.ip);
+      const mask = ia.mask || '255.255.255.252';
+      if (maskToPrefix(mask) === 30 && n != null) {
+        const base = n & ~3;
+        const cand = [base + 1, base + 2].map(numberToIp).find(ip => ip !== ia.ip);
+        const used = new Set(
+          collectIpEndpoints().filter(ep => ep.deviceId !== sideB.id || ep.ip !== ib.ip).map(ep => ep.ip)
+        );
+        if (cand && !used.has(cand)) {
+          ib.ip = cand;
+          ib.mask = mask;
+          return { ok: true, msg: `Completou ${sideB.label} ${ib.name}=${ib.ip}/30`, ia, ib };
+        }
+      }
+    }
+    if (!force && ib.ip && !ia.ip) {
+      const n = ipToNumber(ib.ip);
+      const mask = ib.mask || '255.255.255.252';
+      if (maskToPrefix(mask) === 30 && n != null) {
+        const base = n & ~3;
+        const cand = [base + 1, base + 2].map(numberToIp).find(ip => ip !== ib.ip);
+        const used = new Set(
+          collectIpEndpoints().filter(ep => ep.deviceId !== sideA.id || ep.ip !== ia.ip).map(ep => ep.ip)
+        );
+        if (cand && !used.has(cand)) {
+          ia.ip = cand;
+          ia.mask = mask;
+          return { ok: true, msg: `Completou ${sideA.label} ${ia.name}=${ia.ip}/30`, ia, ib };
+        }
+      }
+    }
+
+    const prevA = ia.ip;
+    const prevB = ib.ip;
+    ia.ip = '';
+    ib.ip = '';
+    const block = nextFreePublicSlash30();
+    if (!block) {
+      ia.ip = prevA || '';
+      ib.ip = prevB || '';
+      return { ok: false, msg: 'Não há bloco /30 livre em 200.0.0.0/16.' };
+    }
+    ia.ip = block.peIp;
+    ia.mask = block.mask;
+    ib.ip = block.ceIp;
+    ib.mask = block.mask;
+    const fixedNote = mismatched ? ' (corrigido: estavam em sub-redes diferentes)' : '';
+    return {
+      ok: true,
+      msg: `${kind} /30: ${sideA.label} ${ia.name}=${ia.ip} ↔ ${sideB.label} ${ib.name}=${ib.ip} (rede ${block.network}/30)${fixedNote}`,
+      ia,
+      ib
+    };
+  }
+
+  /**
+   * Configura (ou completa) o enlace WAN /30 entre ISP e roteador cliente.
+   * PE = lado ISP (.1), CE = lado roteador (.2).
+   */
+  function autoConfigureIspWan(isp, router, linkId, { force = false } = {}) {
+    if (!isp || !router || isp.type !== 'isp' || router.type !== 'router') {
+      return { ok: false, msg: 'Auto WAN só se aplica a enlace ISP ↔ Roteador.' };
+    }
+    const res = autoConfigureP2POnLink(isp, router, linkId, { force, kind: 'WAN' });
+    if (res.ok) {
+      return {
+        ...res,
+        pe: res.ia,
+        ce: res.ib
+      };
+    }
+    return res;
+  }
+
+  /** Peering /30 entre dois ISPs (troca de rotas entre nuvens). */
+  function autoConfigureIspPeering(ispA, ispB, linkId, { force = false } = {}) {
+    if (!ispA || !ispB || ispA.type !== 'isp' || ispB.type !== 'isp') {
+      return { ok: false, msg: 'Peering só se aplica a enlace ISP ↔ ISP.' };
+    }
+    return autoConfigureP2POnLink(ispA, ispB, linkId, { force, kind: 'Peering' });
+  }
+
+  /**
+   * Atribui / corrige /30 em todos os enlaces deste ISP:
+   * - ISP ↔ roteador (WAN cliente)
+   * - ISP ↔ ISP (peering)
+   */
+  function autoConfigureAllIspWans(isp, { force = false } = {}) {
+    if (!isp || isp.type !== 'isp') return { ok: false, done: 0, msgs: [] };
+    const msgs = [];
+    let done = 0;
+    state.links.forEach(link => {
+      const a = getDevice(link.from);
+      const b = getDevice(link.to);
+      if (!a || !b) return;
+      if (a.id !== isp.id && b.id !== isp.id) return;
+
+      let res = null;
+      if ((a.id === isp.id && b.type === 'router') || (b.id === isp.id && a.type === 'router')) {
+        const r = a.type === 'router' ? a : b;
+        res = autoConfigureIspWan(isp, r, link.id, { force });
+      } else if (a.type === 'isp' && b.type === 'isp') {
+        res = autoConfigureIspPeering(a, b, link.id, { force });
+      }
+      if (!res) return;
+
+      if (res.ok && !res.skipped) {
+        done++;
+        msgs.push(res.msg);
+      } else if (res.ok && res.skipped) {
+        msgs.push(res.msg);
+      } else if (!res.ok) {
+        msgs.push(res.msg);
+      }
+    });
+    return { ok: true, done, msgs };
+  }
+
+  /** Corrige todos os enlaces L3 com IPs em sub-redes diferentes (ISP e roteadores). */
+  function fixMismatchedP2PLinks() {
+    const msgs = [];
+    let done = 0;
+    state.links.forEach(link => {
+      const a = getDevice(link.from);
+      const b = getDevice(link.to);
+      if (!a || !b || !isL3Device(a) || !isL3Device(b)) return;
+      const ia = a.interfaces?.find(i => i.linkId === link.id);
+      const ib = b.interfaces?.find(i => i.linkId === link.id);
+      if (!ia || !ib) return;
+      if (ia.ip && ib.ip && sameSlash30Pair(ia, ib)) return;
+      // falta IP ou sub-redes diferentes
+      const kind = (a.type === 'isp' && b.type === 'isp')
+        ? 'Peering'
+        : ((a.type === 'isp' || b.type === 'isp') ? 'WAN' : 'Enlace');
+      const res = autoConfigureP2POnLink(a, b, link.id, { force: true, kind });
+      if (res.ok) {
+        done++;
+        msgs.push(res.msg);
+        updateDeviceIpLabel(a);
+        updateDeviceIpLabel(b);
+      } else {
+        msgs.push(res.msg);
+      }
+    });
+    return { done, msgs };
+  }
+
+  /**
+   * Reassocia o cabo L3↔L3 à interface que realmente tem o IP do enlace.
    * Corrige o caso clássico: cabo em Gi0/0 (vazia) e IP /30 em Gi0/1.
    */
   function rebindP2PLinks() {
     state.links.forEach(link => {
       const a = getDevice(link.from);
       const b = getDevice(link.to);
-      if (!a || !b || a.type !== 'router' || b.type !== 'router') return;
+      if (!a || !b || !isL3Device(a) || !isL3Device(b)) return;
 
       const curA = a.interfaces.find(i => i.linkId === link.id) || null;
       const curB = b.interfaces.find(i => i.linkId === link.id) || null;
@@ -3103,16 +3743,22 @@
         return;
       }
 
-      // Só um lado com IP na interface "certa": move o cabo para a iface com IP
-      const withIpA = candsA.find(i => i.ip);
-      const withIpB = candsB.find(i => i.ip);
-      if (withIpA && curA && withIpA !== curA && !curA.ip) {
-        curA.linkId = null;
-        withIpA.linkId = link.id;
+      // Um lado: só move o cabo se a iface com IP está livre (sem outro cabo)
+      // e NÃO é ISP com IP órfão solto (isso misturava /30 diferentes no peering).
+      // Roteadores: mantém o atalho "IP em Gi0/1, cabo em Gi0/0".
+      if (a.type !== 'isp') {
+        const withIpA = candsA.find(i => i.ip && (!i.linkId || i.linkId === link.id));
+        if (withIpA && curA && withIpA !== curA && !curA.ip) {
+          curA.linkId = null;
+          withIpA.linkId = link.id;
+        }
       }
-      if (withIpB && curB && withIpB !== curB && !curB.ip) {
-        curB.linkId = null;
-        withIpB.linkId = link.id;
+      if (b.type !== 'isp') {
+        const withIpB = candsB.find(i => i.ip && (!i.linkId || i.linkId === link.id));
+        if (withIpB && curB && withIpB !== curB && !curB.ip) {
+          curB.linkId = null;
+          withIpB.linkId = link.id;
+        }
       }
     });
   }
@@ -3123,7 +3769,7 @@
     return { a, b, label: `${a?.label || '?'} ↔ ${b?.label || '?'}` };
   }
 
-  /** Remove um cabo e libera interfaces de roteador ligadas a ele. */
+  /** Remove um cabo e libera interfaces de roteador/ISP ligadas a ele. */
   function removeLink(linkOrId, { silent = false } = {}) {
     const link = typeof linkOrId === 'string'
       ? state.links.find(l => l.id === linkOrId)
@@ -3135,7 +3781,9 @@
     state.devices.forEach(d => {
       if (!d.interfaces) return;
       d.interfaces.forEach(i => {
-        if (i.linkId === link.id) i.linkId = null;
+        if (i.linkId !== link.id) return;
+        i.linkId = null;
+        // Laboratório: mantém IP configurado na PE/interface (só solta o cabo)
       });
     });
 
@@ -3154,8 +3802,10 @@
     state.selectedLinkId = linkId;
     state.selectedId = null;
     state.selectedIds = [];
+    state.selectedRegionId = null;
     state.connectFrom = null;
     updateSelectionUI();
+    updateRegionSelectionUI();
     updateLinks();
     renderProperties();
   }
@@ -3269,17 +3919,31 @@
     }
 
     let iface1 = null, iface2 = null;
-    if (d1.type === 'router') {
+    if (isL3Device(d1)) {
       iface1 = pickRouterIface(d1, d2);
       if (!iface1) {
-        log(`${d1.label} não possui interfaces livres.`, 'err');
+        if (d1.type === 'isp') {
+          log(
+            `${d1.label} esgotou as portas PE (máx. ${ISP_MAX_PE}). Desconecte um cliente ou outro peering para liberar porta.`,
+            'err'
+          );
+        } else {
+          log(`${d1.label} não possui interfaces livres.`, 'err');
+        }
         return;
       }
     }
-    if (d2.type === 'router') {
+    if (isL3Device(d2)) {
       iface2 = pickRouterIface(d2, d1);
       if (!iface2) {
-        log(`${d2.label} não possui interfaces livres.`, 'err');
+        if (d2.type === 'isp') {
+          log(
+            `${d2.label} esgotou as portas PE (máx. ${ISP_MAX_PE}). Desconecte um cliente ou outro peering para liberar porta.`,
+            'err'
+          );
+        } else {
+          log(`${d2.label} não possui interfaces livres.`, 'err');
+        }
         return;
       }
     }
@@ -3287,17 +3951,18 @@
     state.links.push({ id: linkId, from: d1.id, to: d2.id });
     if (iface1) iface1.linkId = linkId;
     if (iface2) iface2.linkId = linkId;
-    // Se IPs /30 já estavam em outras interfaces, alinha o cabo com elas
+    // Realinha cabo se IPs /30 já foram digitados nas interfaces (lab manual ou R↔R)
     rebindP2PLinks();
+
     updateLinks();
     const faceHint = [];
     if (iface1) {
       const ia = d1.interfaces.find(i => i.linkId === linkId);
-      if (ia) faceHint.push(`${d1.label} ${ia.name}`);
+      if (ia) faceHint.push(`${d1.label} ${ia.name}${ia.ip ? ' ' + ia.ip : ''}`);
     }
     if (iface2) {
       const ib = d2.interfaces.find(i => i.linkId === linkId);
-      if (ib) faceHint.push(`${d2.label} ${ib.name}`);
+      if (ib) faceHint.push(`${d2.label} ${ib.name}${ib.ip ? ' ' + ib.ip : ''}`);
     }
     log(
       faceHint.length
@@ -3305,6 +3970,18 @@
         : `Cabo conectado: ${d1.label} ↔ ${d2.label}`,
       'ok'
     );
+    // Laboratório: IPs do ISP/WAN/peering são manuais — não atribui sozinho
+    if ((d1.type === 'isp' || d2.type === 'isp')) {
+      const aIface = d1.interfaces?.find(i => i.linkId === linkId);
+      const bIface = d2.interfaces?.find(i => i.linkId === linkId);
+      const bothOk = aIface && bIface && sameSlash30Pair(aIface, bIface);
+      if (!bothOk) {
+        log(
+          '📝 Configure manualmente os IPs nas interfaces do cabo (mesma sub-rede, ex. /30). No ISP: preencha a PE e Salvar; no roteador: a interface WAN. Opcional: botões de /30 automático no painel do ISP.',
+          'info'
+        );
+      }
+    }
     if (state.selectedId === d1.id || state.selectedId === d2.id) renderProperties();
     markDirty();
   }
@@ -3436,12 +4113,37 @@
         d.y = start.y + dy;
         updateDevicePosition(d);
       });
+      return;
+    }
+    if (state.dragging.type === 'region') {
+      const world = screenToWorld(e.clientX, e.clientY);
+      const dx = world.x - state.dragging.startMouse.x;
+      const dy = world.y - state.dragging.startMouse.y;
+      if (Math.abs(dx) > 0.5 || Math.abs(dy) > 0.5) state.dragging.moved = true;
+      const r = getRegion(state.dragging.id);
+      if (!r) return;
+      r.x = state.dragging.startPos.x + dx;
+      r.y = state.dragging.startPos.y + dy;
+      updateRegionPosition(r);
+      return;
+    }
+    if (state.dragging.type === 'region-resize') {
+      const world = screenToWorld(e.clientX, e.clientY);
+      const r = getRegion(state.dragging.id);
+      if (!r) return;
+      const c = state.dragging.center;
+      const dist = Math.hypot(world.x - c.x, world.y - c.y);
+      const next = Math.max(REGION_MIN_R, Math.min(REGION_MAX_R, dist));
+      if (Math.abs(next - r.radius) > 0.5) state.dragging.moved = true;
+      r.radius = next;
+      updateRegionPosition(r);
     }
   }
 
   function endDrag() {
     const was = state.dragging;
     if (was?.type === 'devices' && was.moved) markDirty();
+    if ((was?.type === 'region' || was?.type === 'region-resize') && was.moved) markDirty();
     if (was?.type === 'pan') {
       document.getElementById('canvas')?.classList.remove('panning');
     }
@@ -3467,8 +4169,11 @@
   function selectDevice(id) {
     state.selectedId = id;
     state.selectedIds = id ? [id] : [];
+    // ao focar dispositivo (ou limpar seleção), tira foco da região
+    state.selectedRegionId = null;
     if (id) state.selectedLinkId = null;
     updateSelectionUI();
+    updateRegionSelectionUI();
     updateLinks();
     renderProperties();
   }
@@ -3484,7 +4189,10 @@
     }
     state.selectedIds = state.devices.map(d => d.id);
     state.selectedId = state.selectedIds[0] || null;
+    state.selectedRegionId = null;
+    state.selectedLinkId = null;
     updateSelectionUI();
+    updateRegionSelectionUI();
     renderProperties();
     log(`${state.selectedIds.length} dispositivo(s) selecionado(s). Arraste um deles para mover o grupo.`, 'action');
   }
@@ -3507,11 +4215,16 @@
       removeLink(state.selectedLinkId);
       return;
     }
+    // região selecionada
+    if (state.selectedRegionId) {
+      deleteSelectedRegion();
+      return;
+    }
     const ids = state.selectedIds.length
       ? [...state.selectedIds]
       : (state.selectedId ? [state.selectedId] : []);
     if (!ids.length) {
-      log('Nenhum dispositivo ou cabo selecionado. Clique no cabo ou no dispositivo e use Excluir.', 'err');
+      log('Nenhum dispositivo, cabo ou região selecionado. Clique no item e use Excluir.', 'err');
       return;
     }
     const labels = ids.map(id => getDevice(id)?.label || id);
@@ -3568,6 +4281,56 @@
 
   function renderProperties() {
     const panel = document.getElementById('properties');
+    if (state.selectedRegionId) {
+      const region = getRegion(state.selectedRegionId);
+      if (!region) {
+        state.selectedRegionId = null;
+      } else {
+        let html = `<h3>${escapeHtml(region.label)} <span style="color:#64748b;font-weight:400;font-size:0.8rem;">(região — só visual)</span></h3>`;
+        html += `<p class="hint">Círculos de cor marcam áreas no laboratório (ex.: Norte, Sul, Datacenter). <strong>Não</strong> alteram cabos, IPs nem rotas.</p>`;
+        html += `<label>Nome da região</label>
+                 <input type="text" id="prop-region-label" value="${escapeHtml(region.label)}" placeholder="Ex.: Região Norte">`;
+        html += `<label>Raio (tamanho)</label>
+                 <input type="number" id="prop-region-radius" min="${REGION_MIN_R}" max="${REGION_MAX_R}" value="${Math.round(region.radius)}">`;
+        html += `<label>Cor</label>
+                 <div class="region-color-swatches" id="region-swatches">`;
+        REGION_COLORS.forEach(c => {
+          const active = (region.color || '').toLowerCase() === c.hex.toLowerCase() ? 'active' : '';
+          html += `<button type="button" class="region-swatch ${active}" data-color="${c.hex}" title="${c.name}" style="background:${c.hex}"></button>`;
+        });
+        html += `</div>`;
+        html += `<label style="margin-top:10px">Cor personalizada</label>
+                 <input type="color" id="prop-region-color" value="${region.color || '#3b82f6'}">`;
+        html += `<p class="hint">Arraste o círculo para mover · bolinha no canto para redimensionar · Excluir remove a região.</p>`;
+        html += `<button id="btn-save-props" style="width:100%;margin-top:14px;">Salvar região</button>`;
+        panel.innerHTML = html;
+        document.getElementById('btn-save-props').onclick = () => {
+          const label = document.getElementById('prop-region-label').value.trim() || region.label;
+          let radius = parseInt(document.getElementById('prop-region-radius').value, 10);
+          if (Number.isNaN(radius)) radius = region.radius;
+          radius = Math.max(REGION_MIN_R, Math.min(REGION_MAX_R, radius));
+          const color = document.getElementById('prop-region-color').value || region.color;
+          region.label = label;
+          region.radius = radius;
+          region.color = color;
+          renderRegion(region);
+          updateRegionSelectionUI();
+          log(`Região "${region.label}" atualizada.`, 'ok');
+          markDirty();
+          renderProperties();
+        };
+        document.querySelectorAll('.region-swatch').forEach(btn => {
+          btn.onclick = () => {
+            region.color = btn.getAttribute('data-color');
+            renderRegion(region);
+            updateRegionSelectionUI();
+            markDirty();
+            renderProperties();
+          };
+        });
+        return;
+      }
+    }
     if (state.selectedLinkId) {
       const link = state.links.find(l => l.id === state.selectedLinkId);
       if (!link) {
@@ -3603,14 +4366,22 @@
     if (!dev) {
       panel.innerHTML = `
         <p style="color:#64748b;font-size:0.85rem;">Selecione um dispositivo para configurar endereçamento IP, máscara e gateway.</p>
-        <p class="hint">Validações: IP único, rede/broadcast, gateway, DHCP (escopo/range/lease), cabos e loops de switch.</p>
+        <p class="hint">Validações: IP único, rede/broadcast, gateway, DHCP (escopo/range/lease), ISP/WAN, cabos e loops de switch.</p>
         <p class="hint" style="margin-top:10px;color:#94a3b8;">🔌 <strong>Modo Conectar:</strong> ative na barra, clique em dois dispositivos. Host↔Host é bloqueado.</p>
         <p class="hint" style="margin-top:8px;">✂ <strong>Desfazer cabo:</strong> clique no cabo (fica vermelho) + Excluir · ou duplo clique · ou botão direito · ou ligue de novo os mesmos dois no modo Conectar.</p>
         <p class="hint" style="margin-top:8px;">📦 <strong>DHCP:</strong> + DHCP → configure pool → no host, modo DHCP → Obter IP. Use Validar e Simular Mensagem para testar.</p>
+        <p class="hint" style="margin-top:8px;">☁️ <strong>ISP (lab manual):</strong> ligue cabos → configure IP/máscara em cada PE e na WAN do roteador (mesma sub-rede). Peering = ISP↔ISP. Auto /30 só se quiser (botões no ISP).</p>
+        <p class="hint" style="margin-top:8px;">⬤ <strong>Região:</strong> + Região → círculo colorido para marcar áreas (Norte, Sul…). Só visual; arraste e redimensione.</p>
         <p class="hint" style="margin-top:8px;">Zoom: scroll no quadro · Mover visão: arraste o fundo · Selecionar tudo: Ctrl+A</p>`;
       return;
     }
-    const typeLabel = { host: 'host', switch: 'switch', router: 'router', dhcp: 'servidor DHCP' }[dev.type] || dev.type;
+    const typeLabel = {
+      host: 'host',
+      switch: 'switch',
+      router: 'router',
+      dhcp: 'servidor DHCP',
+      isp: 'ISP / nuvem Internet'
+    }[dev.type] || dev.type;
     let html = `<h3>${dev.label} <span style="color:#64748b;font-weight:400;font-size:0.8rem;">(${typeLabel})</span></h3>`;
     html += `<label>Nome do dispositivo</label>
              <input type="text" id="prop-label" value="${dev.label}">`;
@@ -3708,48 +4479,150 @@
         <button type="button" id="btn-dhcp-test" class="secondary">🧪 Testar: oferecer IP a um host DHCP do segmento</button>
       </div>`;
       html += `<div id="prop-errors" class="prop-error"></div>`;
-    } else if (dev.type === 'router') {
-      html += `<h4>Interfaces do Roteador</h4>`;
-      html += `<p class="hint">Enlace entre roteadores: coloque o IP na interface <strong>conectada</strong> ao outro roteador (ex.: 10.0.0.1 e 10.0.0.2 com máscara <code>255.255.255.252</code> ou <code>/30</code>).</p>`;
+    } else if (dev.type === 'router' || dev.type === 'isp') {
+      if (dev.type === 'isp') {
+        const peUsed = (dev.interfaces || []).filter(i => i.linkId).length;
+        const peTotal = (dev.interfaces || []).length;
+        html += `<h4>Interfaces PE (Provider Edge) — ${peUsed} em uso / ${peTotal} portas</h4>`;
+        html += `<p class="hint"><strong>Modo laboratório:</strong> configure IP e máscara de cada PE <em>manualmente</em> e clique em Salvar. Começa com 8 portas; se encher (ex.: 7 clientes + peering), o ISP <strong>cria PE novas</strong> até ${ISP_MAX_PE}. Nos dois lados do cabo: <strong>mesma sub-rede</strong> (ex. <code>/30</code>).</p>`;
+        html += `<p class="hint" style="margin-top:6px;color:#64748b">Atalhos opcionais (se não quiser digitar):</p>`;
+        html += `<div class="prop-actions" style="margin-bottom:10px">
+          <button type="button" id="btn-isp-auto-wan" class="secondary">🌐 (Opcional) Preencher /30 nos enlaces sem IP</button>
+          <button type="button" id="btn-isp-auto-wan-force" class="secondary">↻ (Opcional) Reatribuir todos os /30</button>
+          <button type="button" id="btn-isp-fix-mismatch" class="secondary">🔧 (Opcional) Corrigir pares em sub-rede diferente</button>
+        </div>`;
+      } else {
+        html += `<h4>Interfaces do Roteador</h4>`;
+        html += `<p class="hint">LAN: IP na interface ligada ao switch. WAN para ISP ou outro roteador: use <code>/30</code> (ex.: 200.0.0.2 ou 10.0.0.1 com máscara <code>255.255.255.252</code>).</p>`;
+      }
+      // Cabo removido mas PE ainda marcada: libera a porta
+      cleanupOrphanLinkIds(dev);
+
       dev.interfaces.forEach((iface, i) => {
-        let status = 'livre';
+        let status = 'livre (sem cabo)';
         let statusCls = '';
-        let placeholderIp = '192.168.1.1';
+        let boxCls = '';
+        let placeholderIp = dev.type === 'isp' ? '200.0.0.1' : '192.168.1.1';
+        let placeholderMask = dev.type === 'isp' ? '255.255.255.252 ou /30' : '255.255.255.0 ou /30';
         if (iface.linkId) {
           const link = state.links.find(l => l.id === iface.linkId);
           const peerId = link ? (link.from === dev.id ? link.to : link.from) : null;
           const peer = peerId ? getDevice(peerId) : null;
-          if (peer?.type === 'router') {
-            status = `conectada → ${peer.label} (WAN /30)`;
-            placeholderIp = '10.0.0.1';
-          } else if (peer) {
-            status = `conectada → ${peer.label}`;
+          const hasIp = !!(iface.ip && String(iface.ip).trim());
+
+          if (!link || !peer) {
+            // cabo fantasma: libera a porta
+            iface.linkId = null;
+            status = 'livre (sem cabo)';
+            statusCls = '';
+            boxCls = '';
           } else {
-            status = 'conectada';
+            let role = `cabo → ${peer.label}`;
+            if (peer.type === 'isp' && dev.type === 'isp') {
+              role = `peering → ${peer.label}`;
+              placeholderIp = '200.0.0.1';
+              placeholderMask = '255.255.255.252 ou /30';
+            } else if (peer.type === 'isp') {
+              role = `WAN → ${peer.label}`;
+              placeholderIp = '200.0.0.2';
+              placeholderMask = '255.255.255.252 ou /30';
+            } else if (peer.type === 'router' && dev.type === 'isp') {
+              role = `cliente → ${peer.label}`;
+              placeholderIp = '200.0.0.1';
+              placeholderMask = '255.255.255.252 ou /30';
+            } else if (peer.type === 'router') {
+              role = `cabo → ${peer.label}`;
+              placeholderIp = '10.0.0.1';
+            }
+
+            if (hasIp) {
+              // confere se o vizinho no cabo tem IP na mesma sub-rede
+              const peerIface = peer.interfaces?.find(x => x.linkId === iface.linkId);
+              if (peerIface?.ip && sameSlash30Pair(iface, peerIface)) {
+                status = `${role} · IP ok (${iface.ip})`;
+                statusCls = 'connected';
+              } else if (peerIface?.ip) {
+                status = `${role} · ⚠ IP em sub-rede diferente do vizinho`;
+                statusCls = 'need-ip';
+                boxCls = 'need-ip';
+              } else {
+                status = `${role} · IP local ok — configure IP no ${peer.label}`;
+                statusCls = 'need-ip';
+                boxCls = 'need-ip';
+              }
+            } else {
+              // Cabo existe, IP vazio = normal no lab manual
+              status = `${role} · sem IP — digite o IP e Salvar`;
+              statusCls = 'need-ip';
+              boxCls = 'need-ip';
+            }
           }
-          statusCls = 'connected';
         }
         html += `
-          <div class="iface-box">
+          <div class="iface-box ${boxCls}">
             <strong>${iface.name}</strong>
             <span class="iface-status ${statusCls}"> — ${status}</span>
             <label>IP</label>
-            <input type="text" class="iface-ip" data-idx="${i}" value="${iface.ip}" placeholder="${placeholderIp}">
+            <input type="text" class="iface-ip" data-idx="${i}" value="${iface.ip || ''}" placeholder="${placeholderIp}">
             <label>Máscara</label>
-            <input type="text" class="iface-mask" data-idx="${i}" value="${iface.mask}" placeholder="255.255.255.0 ou /30">
+            <input type="text" class="iface-mask" data-idx="${i}" value="${iface.mask || ''}" placeholder="${placeholderMask}">
           </div>`;
       });
       // tabela de rotas
       const routes = buildRoutingTable(dev);
       html += `<h4>Tabela de Rotas (simplificada)</h4>`;
       if (!routes.length) {
-        html += `<p class="hint">Nenhuma rota. Configure IPs nas interfaces.</p>`;
+        html += `<p class="hint">Nenhuma rota. Configure IPs nas interfaces${dev.type === 'isp' ? ' (PEs dos enlaces com clientes ou peering)' : ''}.</p>`;
       } else {
         html += `<div class="hint" style="color:#94a3b8">`;
         routes.forEach(r => {
           html += `<div>• ${r.key} — ${r.type}</div>`;
         });
         html += `</div>`;
+      }
+      if (dev.type === 'isp') {
+        const clientLinks = state.links.filter(l => {
+          const a = getDevice(l.from);
+          const b = getDevice(l.to);
+          return (a?.id === dev.id && b?.type === 'router') || (b?.id === dev.id && a?.type === 'router');
+        });
+        const peerLinks = state.links.filter(l => {
+          const a = getDevice(l.from);
+          const b = getDevice(l.to);
+          return a && b && a.type === 'isp' && b.type === 'isp' && (a.id === dev.id || b.id === dev.id);
+        });
+        html += `<h4>Clientes conectados (${clientLinks.length})</h4>`;
+        if (!clientLinks.length) {
+          html += `<p class="hint">Nenhum roteador ligado. Conecte Roteador ↔ ISP e configure IPs nas duas pontas.</p>`;
+        } else {
+          html += `<div class="hint" style="color:#0c4a6e">`;
+          clientLinks.forEach(l => {
+            const a = getDevice(l.from);
+            const b = getDevice(l.to);
+            const r = a.id === dev.id ? b : a;
+            const pe = dev.interfaces.find(i => i.linkId === l.id);
+            const ce = r.interfaces?.find(i => i.linkId === l.id);
+            const ok = pe && ce && sameSlash30Pair(pe, ce);
+            html += `<div>• ${r.label} — PE ${pe?.name || '?'}=${pe?.ip || 'sem IP'} ↔ CE ${ce?.name || '?'}=${ce?.ip || 'sem IP'}${ok ? ' ✓' : ' ⚠ configure mesma sub-rede'}</div>`;
+          });
+          html += `</div>`;
+        }
+        html += `<h4>Peering com outros ISPs (${peerLinks.length})</h4>`;
+        if (!peerLinks.length) {
+          html += `<p class="hint">Nenhum peering. Conecte <strong>ISP ↔ ISP</strong> e configure um /30 (ou outra máscara) igual nos dois lados.</p>`;
+        } else {
+          html += `<div class="hint" style="color:#5b21b6">`;
+          peerLinks.forEach(l => {
+            const a = getDevice(l.from);
+            const b = getDevice(l.to);
+            const other = a.id === dev.id ? b : a;
+            const ia = dev.interfaces.find(i => i.linkId === l.id);
+            const ib = other.interfaces?.find(i => i.linkId === l.id);
+            const ok = ia && ib && sameSlash30Pair(ia, ib);
+            html += `<div>• ${other.label} — ${ia?.name || '?'}=${ia?.ip || 'sem IP'} ↔ ${ib?.name || '?'}=${ib?.ip || 'sem IP'}${ok ? ' ✓' : ' ⚠ configure mesma sub-rede'}</div>`;
+          });
+          html += `</div>`;
+        }
       }
       html += `<div id="prop-errors" class="prop-error"></div>`;
     } else {
@@ -3810,6 +4683,48 @@
         runValidation(false);
       };
     }
+    const btnIspAuto = document.getElementById('btn-isp-auto-wan');
+    if (btnIspAuto) {
+      btnIspAuto.onclick = () => {
+        const res = autoConfigureAllIspWans(dev, { force: false });
+        res.msgs.forEach(m => log(m, 'info'));
+        log(res.done
+          ? `🌐 ${res.done} enlace(s) WAN configurado(s) automaticamente.`
+          : 'Nenhum enlace novo para configurar (já ok ou sem clientes).', res.done ? 'ok' : 'warn');
+        state.devices.forEach(updateDeviceIpLabel);
+        markDirty();
+        renderProperties();
+        runValidation(false);
+      };
+    }
+    const btnIspForce = document.getElementById('btn-isp-auto-wan-force');
+    if (btnIspForce) {
+      btnIspForce.onclick = () => {
+        if (!confirm('Reatribuir IPs /30 de clientes e peerings deste ISP? IPs atuais dos enlaces serão substituídos.')) return;
+        const res = autoConfigureAllIspWans(dev, { force: true });
+        res.msgs.forEach(m => log(m, 'info'));
+        log(`🌐 Reatribuição: ${res.done} enlace(s) atualizado(s).`, 'ok');
+        state.devices.forEach(updateDeviceIpLabel);
+        markDirty();
+        renderProperties();
+        runValidation(false);
+      };
+    }
+    const btnIspFix = document.getElementById('btn-isp-fix-mismatch');
+    if (btnIspFix) {
+      btnIspFix.onclick = () => {
+        const res = fixMismatchedP2PLinks();
+        res.msgs.forEach(m => log(m, 'info'));
+        log(res.done
+          ? `🔧 ${res.done} enlace(s) corrigido(s) para o mesmo /30.`
+          : 'Nenhum enlace desalinhado encontrado.', res.done ? 'ok' : 'info');
+        state.devices.forEach(updateDeviceIpLabel);
+        markDirty();
+        renderProperties();
+        runValidation(false);
+      };
+    }
+
     const btnTest = document.getElementById('btn-dhcp-test');
     if (btnTest) {
       btnTest.onclick = () => testDhcpServer(dev);
@@ -3964,7 +4879,7 @@
         const other = state.devices.find(d => {
           if (d.id === dev.id) return false;
           if ((d.type === 'host' || d.type === 'dhcp') && d.ip === ip) return true;
-          if (d.type === 'router') return d.interfaces?.some(x => x.ip === ip);
+          if (isL3Device(d)) return d.interfaces?.some(x => x.ip === ip);
           return false;
         });
         if (other) {
@@ -3986,7 +4901,8 @@
       dev.dhcp = draft;
       // se máscara do servidor vazia, alinha com escopo
       if (!dev.mask) dev.mask = poolMask;
-    } else if (dev.type === 'router') {
+    } else if (dev.type === 'router' || dev.type === 'isp') {
+      const defaultMask = dev.type === 'isp' ? '255.255.255.252' : '255.255.255.0';
       const draft = dev.interfaces.map((iface, i) => {
         const ipEl = document.querySelector(`.iface-ip[data-idx="${i}"]`);
         const maskEl = document.querySelector(`.iface-mask[data-idx="${i}"]`);
@@ -3995,8 +4911,8 @@
         return {
           ...iface,
           ip: ipEl ? ipEl.value.trim() : iface.ip,
-          // vazio → default /24; se preenchido, normaliza (/30 → 255.255.255.252)
-          mask: rawMask ? (normMask || rawMask) : '255.255.255.0',
+          // vazio → default; se preenchido, normaliza (/30 → 255.255.255.252)
+          mask: rawMask ? (normMask || rawMask) : defaultMask,
           _maskInvalid: !!(rawMask && !normMask)
         };
       });
@@ -4005,7 +4921,7 @@
         if (!iface.ip) return;
         if (iface._maskInvalid) {
           localErrors.push(
-            `${dev.label} ${iface.name}: máscara inválida. Use 255.255.255.252 ou /30 (enlace entre roteadores).`
+            `${dev.label} ${iface.name}: máscara inválida. Use 255.255.255.252 ou /30 (enlace WAN / entre roteadores).`
           );
           return;
         }
@@ -4014,7 +4930,7 @@
         });
       });
 
-      // redes distintas entre interfaces do mesmo roteador
+      // redes distintas entre interfaces do mesmo equipamento L3
       for (let i = 0; i < draft.length; i++) {
         for (let j = i + 1; j < draft.length; j++) {
           const a = draft[i], b = draft[j];
@@ -4039,7 +4955,7 @@
         const other = state.devices.find(d => {
           if (d.id === dev.id) return false;
           if ((d.type === 'host' || d.type === 'dhcp') && d.ip === iface.ip) return true;
-          if (d.type === 'router') return d.interfaces.some(x => x.ip === iface.ip);
+          if (isL3Device(d)) return d.interfaces.some(x => x.ip === iface.ip);
           return false;
         });
         if (other) {
@@ -4256,12 +5172,12 @@
       const d = getDevice(id);
       return d && (d.type === 'host' || d.type === 'switch' || d.id === srcId || d.id === dstId);
     });
-    // se redes diferentes e path não inclui nenhum router
+    // se redes diferentes e path não inclui nenhum equipamento L3 (roteador/ISP)
     const routersInPath = physicalPath
       .map(id => getDevice(id))
-      .filter(d => d && d.type === 'router');
+      .filter(d => d && isL3Device(d));
     if (!routersInPath.length) {
-      failSim('Não existe um roteador para encaminhar o pacote para outra rede.');
+      failSim('Não existe um roteador (ou ISP) para encaminhar o pacote para outra rede.');
       return;
     }
 
@@ -4323,7 +5239,7 @@
       if (direct) return path;
 
       neighborsOf(last).forEach(n => {
-        if (n.type === 'router' && !visited.has(n.id)) {
+        if (isL3Device(n) && !visited.has(n.id)) {
           visited.add(n.id);
           queue.push([...path, n.id]);
         }
@@ -4684,16 +5600,19 @@
           `<div class="pdu-binary">${binShort}</div>`,
           `<strong>Quadro</strong> ${from.label} → ${to.label}`
         );
-      } else if (to.type === 'router' || from.type === 'router') {
+      } else if (isL3Device(to) || isL3Device(from)) {
+        const viaIsp = to.type === 'isp' || from.type === 'isp';
         showTransformPanel('No cabo / meios', [
           { kind: 'binary', badge: 'Binário', text: 'Bits no meio físico' },
-          { kind: 'frame', badge: 'Quadro', text: 'Novo quadro no enlace' },
-          { kind: 'packet', badge: 'Pacote', text: `Roteamento IP ${srcIp} → ${dstIp}` }
+          { kind: 'frame', badge: 'Quadro', text: viaIsp ? 'Enlace WAN cliente↔ISP' : 'Novo quadro no enlace' },
+          { kind: 'packet', badge: 'Pacote', text: viaIsp
+            ? `Trânsito pela Internet (ISP) ${srcIp} → ${dstIp}`
+            : `Roteamento IP ${srcIp} → ${dstIp}` }
         ], 2);
         setPduView(
           'packet',
           `"${msg}"`,
-          `<strong>Pacote IP</strong> · via ${from.label} → ${to.label}`
+          `<strong>Pacote IP</strong> · via ${from.label} → ${to.label}${viaIsp ? ' (ISP)' : ''}`
         );
       } else {
         setPduView(
@@ -4703,7 +5622,10 @@
         );
       }
 
-      log(`  ↳ ${from.label} → ${to.label} (${to.type === 'router' ? 'pacote IP' : to.type === 'switch' ? 'quadro L2' : 'bits'})`, 'info');
+      const hopKind = isL3Device(to)
+        ? (to.type === 'isp' ? 'nuvem ISP' : 'pacote IP')
+        : (to.type === 'switch' ? 'quadro L2' : 'bits');
+      log(`  ↳ ${from.label} → ${to.label} (${hopKind})`, 'info');
       await movePdu(from, to, 1500);
       if (playback.aborted) throw new Error('aborted');
       await sleep(450);
@@ -4931,7 +5853,9 @@
   document.getElementById('btn-host').onclick = () => createDevice('host');
   document.getElementById('btn-switch').onclick = () => createDevice('switch');
   document.getElementById('btn-router').onclick = () => createDevice('router');
+  document.getElementById('btn-isp').onclick = () => createDevice('isp');
   document.getElementById('btn-dhcp').onclick = () => createDevice('dhcp');
+  document.getElementById('btn-region').onclick = () => createRegion();
 
   document.getElementById('btn-connect').onclick = () => {
     if (state.mode === 'connect') {
@@ -4941,7 +5865,7 @@
       setMode('connect');
       updateLinks();
       log('🔌 MODO LIGAÇÃO ATIVO — clique em dois dispositivos para criar o cabo entre eles.', 'action');
-      log('Regras: Host↔Switch, DHCP↔Switch, Switch↔Roteador, Switch↔Switch, Roteador↔Roteador. Host↔Host bloqueado.', 'info');
+      log('Regras: Host↔Switch, DHCP↔Switch, Switch↔Roteador, Switch↔Switch, Roteador↔Roteador, Roteador↔ISP, ISP↔ISP (peering). Host↔Host bloqueado.', 'info');
       log('Para DESFAZER: clique nos mesmos dois de novo, ou clique no cabo, ou botão direito no cabo.', 'info');
     }
   };
@@ -4960,6 +5884,8 @@
     if (!confirm('Tem certeza que deseja apagar toda a topologia?')) return;
     state.devices = [];
     state.links = [];
+    state.regions = [];
+    state.selectedRegionId = null;
     clearCanvasDevices();
     updateLinks();
     selectDevice(null);
@@ -5001,16 +5927,17 @@
   const canvasEl = document.getElementById('canvas');
 
   canvasEl.addEventListener('click', e => {
-    if (e.target.closest('.device') || e.target.closest('.canvas-controls') || e.target.closest('#transform-panel')) return;
+    if (e.target.closest('.device') || e.target.closest('.region') || e.target.closest('.canvas-controls') || e.target.closest('#transform-panel')) return;
     if (e.target.closest('.link-hit') || e.target.closest('.link-group')) return;
     if (state.mode !== 'connect' && !state.dragging) {
       state.selectedLinkId = null;
+      state.selectedRegionId = null;
       selectDevice(null);
     }
   });
 
   canvasEl.addEventListener('mousedown', e => {
-    if (e.target.closest('.device') || e.target.closest('.canvas-controls') || e.target.closest('#transform-panel') || e.target.closest('button')) return;
+    if (e.target.closest('.device') || e.target.closest('.region') || e.target.closest('.canvas-controls') || e.target.closest('#transform-panel') || e.target.closest('button')) return;
     // botão do meio, Espaço+clique, Alt+clique ou arraste no fundo: pan
     if (e.button === 1 || (e.button === 0 && (state.spaceDown || e.altKey || state.mode !== 'connect'))) {
       if (state.mode === 'connect' && e.button === 0 && !state.spaceDown && !e.altKey) return;
