@@ -339,62 +339,6 @@
       transform-origin: 0 0;
       will-change: transform;
     }
-    .canvas-controls {
-      position: absolute;
-      right: 12px;
-      top: 12px;
-      z-index: 70;
-      display: flex;
-      flex-direction: column;
-      gap: 6px;
-      align-items: stretch;
-      pointer-events: auto;
-    }
-    .canvas-controls .zoom-row {
-      display: flex;
-      gap: 4px;
-      background: #ffffff;
-      border: 1px solid #e2e8f0;
-      border-radius: 8px;
-      padding: 4px;
-      box-shadow: 0 4px 14px rgba(15, 23, 42, 0.08);
-    }
-    .canvas-controls button {
-      padding: 6px 10px;
-      font-size: 0.78rem;
-      min-width: 34px;
-      background: #f8fafc;
-      color: #334155;
-      border: 1px solid #e2e8f0;
-    }
-    .canvas-controls button:hover {
-      background: #eff6ff;
-      color: #1d4ed8;
-      border-color: #bfdbfe;
-    }
-    .canvas-controls .zoom-label {
-      min-width: 52px;
-      text-align: center;
-      font-size: 0.72rem;
-      font-weight: 600;
-      color: #475569;
-      display: flex;
-      align-items: center;
-      justify-content: center;
-      padding: 0 4px;
-      user-select: none;
-    }
-    .canvas-controls .ctrl-hint {
-      font-size: 0.62rem;
-      color: #94a3b8;
-      text-align: right;
-      line-height: 1.25;
-      max-width: 160px;
-      background: rgba(255,255,255,0.9);
-      border-radius: 6px;
-      padding: 4px 6px;
-      border: 1px solid #f1f5f9;
-    }
     .connect-banner {
       display: none;
       position: absolute;
@@ -1197,18 +1141,6 @@
       <div class="connect-banner" id="connect-banner">
         <span id="connect-banner-title">🔌 MODO LIGAÇÃO ATIVO</span>
         <div class="step" id="connect-step">Clique no primeiro dispositivo</div>
-      </div>
-      <div class="canvas-controls" id="canvas-controls">
-        <div class="zoom-row">
-          <button type="button" id="btn-zoom-out" title="Diminuir zoom (−)">−</button>
-          <span class="zoom-label" id="zoom-label">100%</span>
-          <button type="button" id="btn-zoom-in" title="Aumentar zoom (+)">+</button>
-          <button type="button" id="btn-zoom-reset" title="Resetar zoom e posição">100%</button>
-        </div>
-        <div class="zoom-row">
-          <button type="button" id="btn-canvas-select-all" title="Selecionar todos (Ctrl+A)">Selecionar tudo</button>
-        </div>
-        <div class="ctrl-hint">Scroll: zoom · Arraste o fundo: mover quadro · Ctrl+A: tudo</div>
       </div>
       <div id="transform-panel">
         <div class="tf-header">
@@ -4809,8 +4741,6 @@
     if (!world) return;
     const { zoom, panX, panY } = state.view;
     world.style.transform = `translate(${panX}px, ${panY}px) scale(${zoom})`;
-    const label = document.getElementById('zoom-label');
-    if (label) label.textContent = Math.round(zoom * 100) + '%';
     // grade do canvas acompanha o zoom visualmente
     const canvas = document.getElementById('canvas');
     if (canvas) {
@@ -6876,13 +6806,6 @@
 
   document.getElementById('btn-delete').onclick = () => deleteSelectedDevices();
   document.getElementById('btn-select-all').onclick = () => selectAllDevices();
-  document.getElementById('btn-canvas-select-all').onclick = () => selectAllDevices();
-  document.getElementById('btn-zoom-in').onclick = () => zoomBy(VIEW_ZOOM_STEP);
-  document.getElementById('btn-zoom-out').onclick = () => zoomBy(-VIEW_ZOOM_STEP);
-  document.getElementById('btn-zoom-reset').onclick = () => {
-    resetView();
-    log('Zoom e posição do quadro reiniciados.', 'info');
-  };
 
   document.getElementById('btn-clear').onclick = () => {
     if (!confirm('Tem certeza que deseja apagar toda a topologia?')) return;
@@ -6949,7 +6872,7 @@
   const canvasEl = document.getElementById('canvas');
 
   canvasEl.addEventListener('click', e => {
-    if (e.target.closest('.canvas-controls') || e.target.closest('#transform-panel')) return;
+    if (e.target.closest('#transform-panel')) return;
     if (e.target.closest('.link-hit') || e.target.closest('.link-group')) return;
 
     // Criar região só no clique do usuário no quadro (não nasce sozinha)
@@ -6972,7 +6895,7 @@
   });
 
   canvasEl.addEventListener('mousedown', e => {
-    if (e.target.closest('.device') || e.target.closest('.region') || e.target.closest('.canvas-controls') || e.target.closest('#transform-panel') || e.target.closest('button')) return;
+    if (e.target.closest('.device') || e.target.closest('.region') || e.target.closest('#transform-panel') || e.target.closest('button')) return;
     // no modo colocar região, clique esquerdo posiciona — não faz pan
     if (state.mode === 'place-region' && e.button === 0 && !state.spaceDown && !e.altKey) return;
     // botão do meio, Espaço+clique, Alt+clique ou arraste no fundo: pan
