@@ -1,0 +1,215 @@
+{
+  "version": 2,
+  "savedAt": "2026-08-06T21:00:00.000Z",
+  "lab": {
+    "id": "sec-04-invasao",
+    "titulo": "Duas redes + teste de invasão (firewall)",
+    "objetivo": "Montar/usar duas redes completas ligadas pelo ISP. Com firewall OFF o teste de invasão rouba o arquivo secreto (rede falhou). Aluno liga o firewall no host, salva e reteste — ataque bloqueado.",
+    "errosPlantados": 4,
+    "sucesso": "Invasão bloqueada nos hosts com arquivo secreto (firewall ON) e auditoria de Segurança sem falha crítica de firewall.",
+    "roteiro": [
+      "1) Observe Site A e Site B (duas LANs) ligadas ao ISP.",
+      "2) Cada host tem um arquivo secreto e o firewall começa DESLIGADO.",
+      "3) Professor: 🎯 Teste de invasão → escolha PC-SiteA ou PC-SiteB → invasão BEM-SUCEDIDA (vermelho).",
+      "4) Aluno: no host, marque Firewall do host ativo → Salvar configuração.",
+      "5) Reteste a invasão → deve BLOQUEAR (verde).",
+      "6) (Opcional) Auditar 🔒 Segurança e corrigir outros itens em vermelho."
+    ]
+  },
+  "nextId": 20,
+  "devices": [
+    {
+      "id": "dev1",
+      "type": "host",
+      "x": 80,
+      "y": 120,
+      "label": "PC-SiteA",
+      "ip": "192.168.1.10",
+      "mask": "255.255.255.0",
+      "gateway": "192.168.1.1",
+      "dns": "8.8.8.8",
+      "ipMode": "static",
+      "dhcpLease": null,
+      "dhcp": null,
+      "interfaces": null,
+      "security": {
+        "password": "SiteA#Host10",
+        "updatesEnabled": true,
+        "firewallEnabled": false,
+        "publicWifiAllowed": false,
+        "secretFileName": "folha-de-pagamento-A.txt",
+        "secretFileContent": "Salários Site A — NÃO COMPARTILHAR — código interno A-8841",
+        "lastBreachAt": null,
+        "lastBreachStolen": null
+      }
+    },
+    {
+      "id": "dev2",
+      "type": "switch",
+      "x": 200,
+      "y": 220,
+      "label": "SW-A",
+      "ip": "",
+      "mask": null,
+      "gateway": "",
+      "dns": "",
+      "ipMode": null,
+      "dhcpLease": null,
+      "dhcp": null,
+      "interfaces": null,
+      "security": null
+    },
+    {
+      "id": "dev3",
+      "type": "router",
+      "x": 200,
+      "y": 360,
+      "label": "R-A",
+      "ip": "",
+      "mask": null,
+      "gateway": "",
+      "dns": "",
+      "ipMode": null,
+      "dhcpLease": null,
+      "dhcp": null,
+      "interfaces": [
+        { "name": "Gi0/0", "ip": "192.168.1.1", "mask": "255.255.255.0", "linkId": "lnk2" },
+        { "name": "Gi0/1", "ip": "200.0.0.2", "mask": "255.255.255.252", "linkId": "lnk3" },
+        { "name": "Gi0/2", "ip": "", "mask": "255.255.255.0", "linkId": null },
+        { "name": "Gi0/3", "ip": "", "mask": "255.255.255.0", "linkId": null }
+      ],
+      "security": {
+        "adminPassword": "RouterA#Admin99",
+        "updatesEnabled": true,
+        "firewallEnabled": false,
+        "wifiEnabled": false,
+        "wifiSsid": "",
+        "wifiPassword": "",
+        "wifiProtocol": "open",
+        "remoteAdmin": false
+      }
+    },
+    {
+      "id": "dev4",
+      "type": "isp",
+      "x": 420,
+      "y": 360,
+      "label": "ISP",
+      "ip": "",
+      "mask": null,
+      "gateway": "",
+      "dns": "",
+      "ipMode": null,
+      "dhcpLease": null,
+      "dhcp": null,
+      "interfaces": [
+        { "name": "PE0/0", "ip": "200.0.0.1", "mask": "255.255.255.252", "linkId": "lnk3" },
+        { "name": "PE0/1", "ip": "200.0.1.1", "mask": "255.255.255.252", "linkId": "lnk6" },
+        { "name": "PE0/2", "ip": "", "mask": "255.255.255.252", "linkId": null },
+        { "name": "PE0/3", "ip": "", "mask": "255.255.255.252", "linkId": null },
+        { "name": "PE0/4", "ip": "", "mask": "255.255.255.252", "linkId": null },
+        { "name": "PE0/5", "ip": "", "mask": "255.255.255.252", "linkId": null },
+        { "name": "PE0/6", "ip": "", "mask": "255.255.255.252", "linkId": null },
+        { "name": "PE0/7", "ip": "", "mask": "255.255.255.252", "linkId": null }
+      ],
+      "security": null
+    },
+    {
+      "id": "dev5",
+      "type": "router",
+      "x": 640,
+      "y": 360,
+      "label": "R-B",
+      "ip": "",
+      "mask": null,
+      "gateway": "",
+      "dns": "",
+      "ipMode": null,
+      "dhcpLease": null,
+      "dhcp": null,
+      "interfaces": [
+        { "name": "Gi0/0", "ip": "192.168.2.1", "mask": "255.255.255.0", "linkId": "lnk5" },
+        { "name": "Gi0/1", "ip": "200.0.1.2", "mask": "255.255.255.252", "linkId": "lnk6" },
+        { "name": "Gi0/2", "ip": "", "mask": "255.255.255.0", "linkId": null },
+        { "name": "Gi0/3", "ip": "", "mask": "255.255.255.0", "linkId": null }
+      ],
+      "security": {
+        "adminPassword": "RouterB#Admin99",
+        "updatesEnabled": true,
+        "firewallEnabled": false,
+        "wifiEnabled": false,
+        "wifiSsid": "",
+        "wifiPassword": "",
+        "wifiProtocol": "open",
+        "remoteAdmin": false
+      }
+    },
+    {
+      "id": "dev6",
+      "type": "switch",
+      "x": 640,
+      "y": 220,
+      "label": "SW-B",
+      "ip": "",
+      "mask": null,
+      "gateway": "",
+      "dns": "",
+      "ipMode": null,
+      "dhcpLease": null,
+      "dhcp": null,
+      "interfaces": null,
+      "security": null
+    },
+    {
+      "id": "dev7",
+      "type": "host",
+      "x": 760,
+      "y": 120,
+      "label": "PC-SiteB",
+      "ip": "192.168.2.10",
+      "mask": "255.255.255.0",
+      "gateway": "192.168.2.1",
+      "dns": "8.8.8.8",
+      "ipMode": "static",
+      "dhcpLease": null,
+      "dhcp": null,
+      "interfaces": null,
+      "security": {
+        "password": "SiteB#Host10",
+        "updatesEnabled": true,
+        "firewallEnabled": false,
+        "publicWifiAllowed": false,
+        "secretFileName": "contrato-cliente-B.txt",
+        "secretFileContent": "Contrato confidencial Site B — valor R$ 150.000 — NÃO VAZAR",
+        "lastBreachAt": null,
+        "lastBreachStolen": null
+      }
+    }
+  ],
+  "links": [
+    { "id": "lnk1", "from": "dev1", "to": "dev2" },
+    { "id": "lnk2", "from": "dev2", "to": "dev3" },
+    { "id": "lnk3", "from": "dev3", "to": "dev4" },
+    { "id": "lnk4", "from": "dev7", "to": "dev6" },
+    { "id": "lnk5", "from": "dev6", "to": "dev5" },
+    { "id": "lnk6", "from": "dev5", "to": "dev4" }
+  ],
+  "regions": [
+    {
+      "id": "reg1",
+      "label": "Site A — 192.168.1.0/24",
+      "x": 160,
+      "y": 220,
+      "radius": 160,
+      "color": "#3b82f6"
+    },
+    {
+      "id": "reg2",
+      "label": "Site B — 192.168.2.0/24",
+      "x": 720,
+      "y": 220,
+      "radius": 160,
+      "color": "#22c55e"
+    }
+  ]
+}

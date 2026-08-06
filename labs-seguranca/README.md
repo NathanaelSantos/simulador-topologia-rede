@@ -11,13 +11,16 @@ Cada lab planta **falhas de segurança** (senhas, Wi-Fi, firewall, atualizaçõe
 4. Corrija as falhas em **vermelho** nos dispositivos (painel de propriedades → bloco 🔒 Segurança).
 5. Clique de novo em **🔒 Segurança** até o badge ficar **OK**.
 
-### Gancho de aula: arquivo secreto + teste de invasão
+### Sequência de aula: duas redes + invasão + firewall
 
-1. No **Host (PC)**, o aluno cria um **arquivo secreto** (nome + conteúdo) e **Salva**.
-2. O professor clica em **🎯 Teste de invasão**, escolhe o host e tenta obter o arquivo.
-3. **Firewall OFF** → professor lê o arquivo → **rede falhou** (vermelho).
-4. Aluno liga o **firewall do host**, salva, reteste → ataque bloqueado (verde).
-5. Aí entra a explicação formal de **firewall** (e depois firewall no roteador).
+Ideia: a turma monta (ou importa) **duas redes completas** ligadas pelo **ISP**. Os PCs têm arquivo secreto e começam **sem firewall**.
+
+1. **Montar a rede** — Site A e Site B com host, switch, roteador, IPs e cabos (ou importe `04-duas-redes-invasao.json`).
+2. **Arquivo secreto** — no host, nome + conteúdo (no lab 04 já vem pronto) e **Salvar**.
+3. **1º teste de invasão** (professor) — **🎯 Teste de invasão** → host alvo → **sucesso do ataque** (vermelho) porque o firewall está OFF.
+4. **Proteger** — aluno marca **Firewall do host ativo**, salva (opcional: firewall do roteador também).
+5. **2º teste de invasão** — mesmo host → **ataque bloqueado** (verde). Rede resiste.
+6. **Discutir** — o que o firewall faz; diferença host vs roteador; demais itens de 🔒 Segurança.
 
 > Entregue só os JSON + este README. O gabarito fica com o professor (`gabarito/`).
 
@@ -40,13 +43,15 @@ Cada lab planta **falhas de segurança** (senhas, Wi-Fi, firewall, atualizaçõe
 | `01-rede-insegura.json` | Várias falhas de uma vez (senhas, Wi-Fi aberto, firewall off…) | ★★☆ |
 | `02-wifi-obsoleto.json` | Wi-Fi com WEP e senha fraca | ★☆☆ |
 | `03-hosts-desprotegidos.json` | Hosts sem senha, sem firewall, Wi-Fi pública liberada | ★☆☆ |
+| `04-duas-redes-invasao.json` | **Duas redes + ISP + invasão** (firewall OFF → falha → ON → bloqueia) | ★★☆ |
 
-## Sugestão de aula (40–50 min)
+## Sugestão de aula (40–50 min) — foco firewall
 
-1. **10 min** — Revisar os 7 tópicos de segurança básica  
-2. **15 min** — Lab 01 (dupla): importar → auditar → corrigir  
-3. **10 min** — Lab 02 ou 03  
-4. **5 min** — Exportar a topologia “segura” e entregar o JSON  
+1. **10 min** — Conceito: “como proteger a rede planejada?”  
+2. **10 min** — Importar `04` (ou montar 2 sites + ISP)  
+3. **10 min** — 1º **Teste de invasão** (falha sem firewall)  
+4. **10 min** — Ligar firewall no host → 2º teste (sucesso da defesa)  
+5. **5–10 min** — Auditar 🔒 Segurança e exportar relatório OK  
 
 ## Critério de sucesso
 

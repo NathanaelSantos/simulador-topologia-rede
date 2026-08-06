@@ -1267,9 +1267,9 @@
     <div class="modal">
       <h2>🎯 Teste de invasão (didático)</h2>
       <p class="hint" style="margin-top:0;margin-bottom:12px">
-        O aluno cria um <strong>arquivo secreto</strong> no host.
-        Se o “invasor” (professor) conseguir ler esse arquivo, a rede <strong>falhou</strong> —
-        esse é o gancho para falar de <strong>firewall</strong>.
+        A turma planeja a rede (ex.: <strong>2 sites + ISP</strong>) com arquivo secreto nos PCs.
+        <strong>1º teste:</strong> sem firewall → invasão obtém o arquivo (rede falhou).
+        <strong>2º teste:</strong> com firewall no host → ataque bloqueado (rede resiste).
       </p>
       <label>Host-alvo (PC com o arquivo)</label>
       <select id="attack-target"></select>
@@ -1279,9 +1279,10 @@
       </div>
       <div id="attack-result" class="attack-result" role="status"></div>
       <p class="hint">
-        Regra do lab: <strong>firewall do host desligado</strong> → invasão obtém o arquivo (vermelho / falha).
-        <strong>Firewall ligado</strong> → ataque bloqueado (verde / rede resiste).
-        Não é um ataque real — só simulação de aula.
+        Regra: <strong>firewall do host OFF</strong> → vermelho (falha).
+        <strong>Firewall ON</strong> → verde (proteção).
+        Depois do bloqueio, use <strong>🔒 Segurança</strong> no painel direito para fechar o checklist.
+        Não é ataque real — simulação de aula.
       </p>
     </div>
   </div>
@@ -3585,11 +3586,12 @@
       const msg = `Firewall do ${host.label} bloqueou o acesso. Arquivo "${fileName}" NÃO foi obtido. Rede resiste ao teste.`;
       if (resultEl) {
         resultEl.className = 'attack-result show pass';
-        resultEl.innerHTML = `✅ ${msg}<br><span style="font-weight:500;opacity:0.9">Gancho de aula: o firewall filtra o tráfego indesejado e protege o arquivo no PC.</span>`;
+        resultEl.innerHTML = `✅ ${msg}<br><span style="font-weight:500;opacity:0.9">Compare com o 1º teste (sem firewall): agora a rede planejada está protegida. Próximo passo: 🔒 Segurança no painel direito.</span>`;
       }
-      log(`🎯 Invasão BLOQUEADA em ${host.label}: firewall ON — arquivo seguro.`, 'ok');
+      log(`🎯 Invasão BLOQUEADA em ${host.label}: firewall ON — arquivo seguro. Reteste após proteger a rede: sucesso da defesa.`, 'ok');
       document.getElementById(host.id)?.classList.remove('has-breach', 'has-security-issue');
       runSecurityAudit(false);
+      saveTopology(true);
       return;
     }
 
@@ -3608,12 +3610,13 @@
     if (resultEl) {
       resultEl.className = 'attack-result show fail';
       resultEl.innerHTML = `❌ ${msg}<br><br>
-        <span style="font-weight:500">A rede da equipe falhou no teste de invasão.</span><br>
-        <span style="font-weight:500;opacity:0.95">Gancho de aula → ative o <strong>firewall do host</strong>, salve e rode o teste de novo. Depois falamos de firewall no roteador.</span>`;
+        <span style="font-weight:500">A rede planejada falhou no teste de invasão (sem firewall).</span><br>
+        <span style="font-weight:500;opacity:0.95"><strong>Próximo passo:</strong> selecione o host → ☑ Firewall do host ativo → <strong>Salvar</strong> → rode o teste de novo. Deve bloquear.</span>`;
     }
-    log(`🎯 Invasão BEM-SUCEDIDA em ${host.label}: arquivo "${fileName}" obtido (firewall OFF).`, 'err');
+    log(`🎯 Invasão BEM-SUCEDIDA em ${host.label}: arquivo "${fileName}" obtido (firewall OFF). Rede desprotegida.`, 'err');
     log(`📄 Conteúdo roubado: ${stolenPreview}`, 'err');
     runSecurityAudit(false);
+    saveTopology(true);
   }
 
   // ========== LOG / HISTÓRICO ==========

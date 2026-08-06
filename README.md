@@ -65,13 +65,13 @@ Abra o site publicado (após ativar o Pages) ou o arquivo `index.html` / `simula
 
 Checklist: senhas, Wi-Fi, WPA/WPA2/WPA3, atualizações, firewall, Wi-Fi pública, proteção dos equipamentos.
 
-### Gancho: arquivo secreto → teste de invasão → firewall
+### Aula: duas redes + invasão + firewall
 
-1. No **Host**, o aluno cria um **arquivo secreto** (nome + conteúdo) e salva  
-2. Professor: **🎯 Teste de invasão** → escolhe o PC → tenta obter o arquivo  
-3. **Firewall OFF** = professor lê o arquivo = **rede falhou** (vermelho)  
-4. Aluno liga o **firewall do host** e retesta = ataque bloqueado (verde)  
-5. Aí você entra na teoria de **firewall** (e depois no roteador)
+1. Alunos montam **2 redes completas** (ou importam `labs-seguranca/04-duas-redes-invasao.json`) ligadas pelo **ISP**  
+2. Hosts com **arquivo secreto** e **firewall OFF** no início  
+3. Professor: **🎯 Teste de invasão** → **sucesso do ataque** (vermelho)  
+4. Aluno liga o **firewall do host**, salva e **retesta** → **bloqueado** (verde)  
+5. Discutir proteção da rede planejada; fechar com **🔒 Segurança** / relatório
 
 ## Arquivos
 
