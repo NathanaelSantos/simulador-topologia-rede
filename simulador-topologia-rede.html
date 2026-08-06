@@ -93,150 +93,9 @@
       display: flex;
       flex-direction: column;
       overflow: hidden;
-      transition: width 0.2s ease, min-width 0.2s ease, opacity 0.15s ease, border-color 0.15s;
       position: relative;
       z-index: 4;
     }
-    body.sidebar-collapsed .sidebar {
-      width: 0;
-      min-width: 0;
-      opacity: 0;
-      border-right-color: transparent;
-      pointer-events: none;
-    }
-    .sidebar-toggle-bar {
-      display: flex;
-      align-items: center;
-      justify-content: space-between;
-      gap: 8px;
-      padding: 6px 10px;
-      border-bottom: 1px solid #e2e8f0;
-      background: #f8fafc;
-      flex-shrink: 0;
-    }
-    .sidebar-toggle-bar span {
-      font-size: 0.72rem;
-      font-weight: 600;
-      color: #475569;
-      letter-spacing: 0.02em;
-    }
-    .sidebar-toggle-bar button {
-      padding: 4px 10px;
-      font-size: 0.72rem;
-      background: #e2e8f0;
-      color: #334155;
-    }
-    .sidebar-toggle-bar button:hover {
-      background: #cbd5e1;
-      color: #1e293b;
-    }
-    #btn-toggle-sidebar {
-      margin-left: auto;
-    }
-    #btn-toggle-sidebar.secondary.active {
-      background: #e2e8f0;
-      color: #334155;
-      box-shadow: none;
-      animation: none;
-    }
-    .sidebar-show-tab {
-      display: none;
-      position: absolute;
-      left: 0;
-      top: 50%;
-      z-index: 40;
-      writing-mode: vertical-rl;
-      text-orientation: mixed;
-      background: #1d4ed8;
-      color: #fff;
-      border: none;
-      border-radius: 0 8px 8px 0;
-      padding: 16px 9px;
-      font-size: 0.78rem;
-      font-weight: 600;
-      letter-spacing: 0.06em;
-      box-shadow: 2px 2px 12px rgba(15, 23, 42, 0.18);
-      cursor: pointer;
-      line-height: 1.2;
-      transform: translateY(-50%);
-    }
-    body.sidebar-collapsed .sidebar-show-tab {
-      display: inline-flex;
-      align-items: center;
-      justify-content: center;
-    }
-    .sidebar-show-tab:hover {
-      background: #1e40af;
-    }
-    .sidebar-show-tab:focus-visible {
-      outline: 2px solid #93c5fd;
-      outline-offset: 2px;
-    }
-    #btn-toggle-sidebar.demo-pulse {
-      background: #1d4ed8 !important;
-      color: #fff !important;
-      box-shadow: 0 0 0 3px rgba(29, 78, 216, 0.35), 0 0 18px rgba(37, 99, 235, 0.45);
-      animation: demo-pulse 1.1s ease-in-out infinite;
-    }
-    @keyframes demo-pulse {
-      0%, 100% { transform: scale(1); }
-      50% { transform: scale(1.05); }
-    }
-    .demo-guide {
-      display: none;
-      position: absolute;
-      top: 14px;
-      right: 14px;
-      z-index: 55;
-      width: min(340px, calc(100% - 28px));
-      background: #fff;
-      border: 2px solid #1d4ed8;
-      border-radius: 12px;
-      box-shadow: 0 12px 32px rgba(15, 23, 42, 0.18);
-      padding: 14px 16px;
-      color: #0f172a;
-    }
-    .demo-guide.show { display: block; }
-    .demo-guide h3 {
-      margin: 0 0 8px;
-      font-size: 0.95rem;
-      color: #1d4ed8;
-    }
-    .demo-guide ol {
-      margin: 0 0 10px 18px;
-      padding: 0;
-      font-size: 0.82rem;
-      line-height: 1.45;
-      color: #334155;
-    }
-    .demo-guide li { margin-bottom: 6px; }
-    .demo-guide kbd {
-      display: inline-block;
-      padding: 1px 6px;
-      border-radius: 4px;
-      border: 1px solid #cbd5e1;
-      background: #f1f5f9;
-      font-size: 0.75rem;
-      font-family: ui-monospace, Consolas, monospace;
-    }
-    .demo-guide .demo-actions {
-      display: flex;
-      flex-wrap: wrap;
-      gap: 6px;
-      margin-top: 8px;
-    }
-    .demo-guide .demo-actions button {
-      font-size: 0.75rem;
-      padding: 6px 10px;
-    }
-    .demo-guide .demo-step-ok {
-      color: #047857;
-      font-weight: 600;
-      font-size: 0.8rem;
-      margin-top: 6px;
-      display: none;
-    }
-    .demo-guide .demo-step-ok.show { display: block; }
     .properties {
       padding: 14px;
       flex: 1 1 auto;
@@ -388,7 +247,12 @@
       line-height: 1.3;
     }
     #security-section {
-      border-top: 1px solid #e2e8f0;
+      border-top: none;
+      min-height: 56px;
+      overflow: hidden;
+    }
+    #security-section .sec-actions {
+      flex-shrink: 0;
     }
     .val-item {
       padding: 3px 6px;
@@ -1265,18 +1129,10 @@
     <button id="btn-security" class="warn-btn" title="Audita senhas, Wi-Fi, firewall e atualizações">🔒 Segurança</button>
     <button id="btn-attack" class="danger" title="Teste didático: tenta obter o arquivo secreto do host (gancho para firewall)">🎯 Teste de invasão</button>
     <button id="btn-simulate">📤 Simular Mensagem</button>
-    <div class="toolbar-sep"></div>
-    <button id="btn-toggle-sidebar" class="secondary" type="button" title="Esconder ou mostrar o painel lateral (Ctrl+B)">☰ Painel</button>
-    <button id="btn-demo-painel" class="secondary" type="button" title="Carrega um exemplo para testar esconder/mostrar o painel">▶ Exemplo painel</button>
   </div>
 
   <div class="main">
-    <button type="button" class="sidebar-show-tab" id="btn-show-sidebar" title="Mostrar painel lateral (Ctrl+B)">Painel ›</button>
     <div class="sidebar" id="sidebar">
-      <div class="sidebar-toggle-bar">
-        <span>Painel lateral</span>
-        <button type="button" id="btn-hide-sidebar" title="Esconder painel (Ctrl+B)">« Esconder</button>
-      </div>
       <div class="properties" id="properties">
         <p style="color:#64748b;font-size:0.85rem;">Selecione um dispositivo para configurar endereçamento IP, máscara e gateway.</p>
         <p class="hint">Dica: hosts (estático ou DHCP), servidor DHCP, roteadores, <strong>ISP (nuvem Internet)</strong> e switches (L2).</p>
@@ -1304,7 +1160,7 @@
         </div>
       </div>
 
-      <div class="sidebar-splitter" id="split-val-sec" title="Arraste para redimensionar" role="separator" aria-orientation="horizontal"></div>
+      <div class="sidebar-splitter" id="split-val-sec" title="Arraste para redimensionar Segurança" role="separator" aria-orientation="horizontal"></div>
 
       <div class="validation-section" id="security-section">
         <h3>
@@ -1341,21 +1197,6 @@
       <div class="connect-banner" id="connect-banner">
         <span id="connect-banner-title">🔌 MODO LIGAÇÃO ATIVO</span>
         <div class="step" id="connect-step">Clique no primeiro dispositivo</div>
-      </div>
-      <div class="demo-guide" id="demo-guide" aria-live="polite">
-        <h3>▶ Exemplo: esconder o painel lateral</h3>
-        <ol>
-          <li>Olhe o botão azul piscando na barra: <strong>☰ Painel</strong>.</li>
-          <li>Clique em <strong>☰ Esconder painel</strong> (ou no « Esconder no topo do painel, ou <kbd>Ctrl</kbd>+<kbd>B</kbd>).</li>
-          <li>O painel some e a aba azul <strong>Painel ›</strong> aparece na borda esquerda.</li>
-          <li>Clique na aba (ou de novo em ☰ Painel / <kbd>Ctrl</kbd>+<kbd>B</kbd>) para reabrir.</li>
-        </ol>
-        <div class="demo-step-ok" id="demo-step-ok">✅ Funcionou! Você escondeu e mostrou o painel.</div>
-        <div class="demo-actions">
-          <button type="button" id="btn-demo-hide" class="secondary">1) Esconder agora</button>
-          <button type="button" id="btn-demo-show" class="secondary">2) Mostrar de novo</button>
-          <button type="button" id="btn-demo-close" class="danger">Fechar guia</button>
-        </div>
       </div>
       <div class="canvas-controls" id="canvas-controls">
         <div class="zoom-row">
@@ -6756,201 +6597,40 @@
   }
 
   // ========== SIDEBAR REDIMENSIONÁVEL ==========
-  const SIDEBAR_SPLIT_KEY = 'sft_redes_sidebar_split_v1';
-  const SIDEBAR_COLLAPSED_KEY = 'sft_redes_sidebar_collapsed_v1';
-
-  function isSidebarCollapsed() {
-    return document.body.classList.contains('sidebar-collapsed');
-  }
-
-  function updateSidebarToggleUI() {
-    const collapsed = isSidebarCollapsed();
-    const btnToolbar = document.getElementById('btn-toggle-sidebar');
-    const btnHide = document.getElementById('btn-hide-sidebar');
-    if (btnToolbar) {
-      btnToolbar.textContent = collapsed ? '☰ Mostrar painel' : '☰ Esconder painel';
-      btnToolbar.setAttribute('aria-pressed', collapsed ? 'true' : 'false');
-      btnToolbar.title = collapsed
-        ? 'Mostrar painel lateral (Ctrl+B)'
-        : 'Esconder painel lateral (Ctrl+B)';
-    }
-    if (btnHide) {
-      btnHide.textContent = '« Esconder';
-    }
-    const showTab = document.getElementById('btn-show-sidebar');
-    if (showTab) {
-      showTab.setAttribute('aria-hidden', collapsed ? 'false' : 'true');
-    }
-  }
-
-  function setSidebarCollapsed(collapsed, { silent = false, persist = true } = {}) {
-    document.body.classList.toggle('sidebar-collapsed', !!collapsed);
-    if (persist) {
-      try {
-        localStorage.setItem(SIDEBAR_COLLAPSED_KEY, collapsed ? '1' : '0');
-      } catch (_) { /* ignore */ }
-    }
-    updateSidebarToggleUI();
-    if (!silent) {
-      log(collapsed
-        ? 'Painel lateral escondido. Use «Painel ›» ou Ctrl+B para mostrar.'
-        : 'Painel lateral visível.', 'info');
-    }
-    // recálculo de splits quando reabre
-    if (!collapsed) {
-      try {
-        window.dispatchEvent(new Event('resize'));
-      } catch (_) { /* ignore */ }
-    }
-    if (typeof updateDemoPainelProgress === 'function') updateDemoPainelProgress();
-  }
-
-  function toggleSidebar() {
-    setSidebarCollapsed(!isSidebarCollapsed());
-  }
-
-  function loadSidebarCollapsed() {
-    try {
-      const raw = localStorage.getItem(SIDEBAR_COLLAPSED_KEY);
-      if (raw === '1') setSidebarCollapsed(true, { silent: true, persist: false });
-      else setSidebarCollapsed(false, { silent: true, persist: false });
-    } catch (_) {
-      setSidebarCollapsed(false, { silent: true, persist: false });
-    }
-  }
-
-  /** Topologia mínima embutida — exemplo para testar esconder/mostrar o painel. */
-  function getDemoPainelTopology() {
-    return {
-      version: 2,
-      savedAt: new Date().toISOString(),
-      lab: {
-        id: 'demo-painel',
-        titulo: 'Exemplo — painel lateral',
-        objetivo: 'Teste esconder e mostrar o painel (☰ Painel, « Esconder, aba Painel › ou Ctrl+B).',
-        sucesso: 'Você escondeu e reabriu o painel sem perder a topologia.'
-      },
-      nextId: 6,
-      devices: [
-        {
-          id: 'dev1', type: 'host', x: 120, y: 160, label: 'PC-Demo',
-          ip: '192.168.10.10', mask: '255.255.255.0', gateway: '192.168.10.1', dns: '8.8.8.8',
-          ipMode: 'static', dhcpLease: null, dhcp: null, interfaces: null,
-          security: {
-            password: 'Demo#2026x', updatesEnabled: true, firewallEnabled: true,
-            publicWifiAllowed: false, secretFileName: '', secretFileContent: ''
-          }
-        },
-        {
-          id: 'dev2', type: 'switch', x: 280, y: 280, label: 'SW-Demo',
-          ip: '', mask: null, gateway: '', dns: '', ipMode: null,
-          dhcpLease: null, dhcp: null, interfaces: null, security: null
-        },
-        {
-          id: 'dev3', type: 'router', x: 280, y: 420, label: 'R-Demo',
-          ip: '', mask: null, gateway: '', dns: '', ipMode: null,
-          dhcpLease: null, dhcp: null,
-          interfaces: [
-            { name: 'Gi0/0', ip: '192.168.10.1', mask: '255.255.255.0', linkId: 'lnk2' },
-            { name: 'Gi0/1', ip: '', mask: '255.255.255.0', linkId: null },
-            { name: 'Gi0/2', ip: '', mask: '255.255.255.0', linkId: null },
-            { name: 'Gi0/3', ip: '', mask: '255.255.255.0', linkId: null }
-          ],
-          security: {
-            adminPassword: 'Router#Demo99', updatesEnabled: true, firewallEnabled: true,
-            wifiEnabled: true, wifiSsid: 'Lab-Demo', wifiPassword: 'Wifi#Demo2026',
-            wifiProtocol: 'wpa2', remoteAdmin: false
-          }
-        },
-        {
-          id: 'dev4', type: 'host', x: 440, y: 160, label: 'PC-2',
-          ip: '192.168.10.20', mask: '255.255.255.0', gateway: '192.168.10.1', dns: '8.8.8.8',
-          ipMode: 'static', dhcpLease: null, dhcp: null, interfaces: null,
-          security: {
-            password: 'Host2#2026x', updatesEnabled: true, firewallEnabled: true,
-            publicWifiAllowed: false, secretFileName: '', secretFileContent: ''
-          }
-        }
-      ],
-      links: [
-        { id: 'lnk1', from: 'dev1', to: 'dev2' },
-        { id: 'lnk2', from: 'dev2', to: 'dev3' },
-        { id: 'lnk3', from: 'dev4', to: 'dev2' }
-      ],
-      regions: [
-        {
-          id: 'reg1', label: 'LAN Demo',
-          x: 300, y: 260, radius: 200, color: '#3b82f6'
-        }
-      ]
-    };
-  }
-
-  let demoPainelState = { active: false, hidOnce: false, showedOnce: false };
-
-  function updateDemoPainelProgress() {
-    if (!demoPainelState.active) return;
-    if (isSidebarCollapsed()) demoPainelState.hidOnce = true;
-    else if (demoPainelState.hidOnce) demoPainelState.showedOnce = true;
-
-    const ok = document.getElementById('demo-step-ok');
-    if (ok && demoPainelState.hidOnce && demoPainelState.showedOnce) {
-      ok.classList.add('show');
-      const btn = document.getElementById('btn-toggle-sidebar');
-      btn?.classList.remove('demo-pulse');
-      log('✅ Exemplo do painel concluído: você escondeu e mostrou o painel lateral.', 'ok');
-    }
-  }
-
-  function closeDemoPainelGuide() {
-    demoPainelState.active = false;
-    document.getElementById('demo-guide')?.classList.remove('show');
-    document.getElementById('btn-toggle-sidebar')?.classList.remove('demo-pulse');
-    document.getElementById('demo-step-ok')?.classList.remove('show');
-  }
-
-  function startDemoPainel({ force = true } = {}) {
-    const topo = getDemoPainelTopology();
-    applyTopology(topo);
-    saveTopology(true);
-    setSidebarCollapsed(false, { silent: true });
-    demoPainelState = { active: true, hidOnce: false, showedOnce: false };
-    const guide = document.getElementById('demo-guide');
-    const ok = document.getElementById('demo-step-ok');
-    if (guide) guide.classList.add('show');
-    if (ok) ok.classList.remove('show');
-    document.getElementById('btn-toggle-sidebar')?.classList.add('demo-pulse');
-    runSecurityAudit(false);
-    runValidation(false);
-    log('▶ Exemplo do painel carregado. Siga o cartão azul à direita (ou use ☰ Painel / Ctrl+B).', 'action');
-    if (force) {
-      try {
-        const url = new URL(window.location.href);
-        url.searchParams.set('demo', 'painel');
-        window.history.replaceState({}, '', url);
-      } catch (_) { /* ignore */ }
-    }
-  }
-
+  const SIDEBAR_SPLIT_KEY = 'sft_redes_sidebar_split_v2';
 
   const SPLITTER_H = 6;
   const MIN_PANEL = 56;
+  const PANEL_KEYS = ['props', 'log', 'val', 'sec'];
 
   function defaultSidebarSplits() {
-    return { props: 0.62, log: 0.22, val: 0.16 };
+    // 4 painéis: propriedades, log, validações, segurança
+    return { props: 0.42, log: 0.18, val: 0.18, sec: 0.22 };
+  }
+
+  function normalizeSidebarSplits(s) {
+    const base = defaultSidebarSplits();
+    const out = { ...base };
+    PANEL_KEYS.forEach(k => {
+      if (typeof s?.[k] === 'number' && s[k] > 0) out[k] = s[k];
+    });
+    // migração v1 (sem sec): fatia val antiga vira val+sec
+    if (s && typeof s.sec !== 'number' && typeof s.val === 'number') {
+      out.val = s.val * 0.45;
+      out.sec = s.val * 0.55;
+    }
+    const sum = PANEL_KEYS.reduce((a, k) => a + out[k], 0);
+    if (sum <= 0.01) return defaultSidebarSplits();
+    PANEL_KEYS.forEach(k => { out[k] = out[k] / sum; });
+    return out;
   }
 
   function loadSidebarSplits() {
     try {
-      const raw = localStorage.getItem(SIDEBAR_SPLIT_KEY);
+      const raw = localStorage.getItem(SIDEBAR_SPLIT_KEY)
+        || localStorage.getItem('sft_redes_sidebar_split_v1');
       if (!raw) return defaultSidebarSplits();
-      const s = JSON.parse(raw);
-      if (typeof s.props === 'number' && typeof s.log === 'number' && typeof s.val === 'number') {
-        const sum = s.props + s.log + s.val;
-        if (sum > 0.5) {
-          return { props: s.props / sum, log: s.log / sum, val: s.val / sum };
-        }
-      }
+      return normalizeSidebarSplits(JSON.parse(raw));
     } catch (_) { /* ignore */ }
     return defaultSidebarSplits();
   }
@@ -6961,76 +6641,84 @@
     } catch (_) { /* ignore */ }
   }
 
+  function getSidebarUsableHeight(sidebar) {
+    if (!sidebar) return 0;
+    const splitterCount = sidebar.querySelectorAll('.sidebar-splitter').length || 3;
+    return Math.max(0, sidebar.clientHeight - SPLITTER_H * splitterCount);
+  }
+
+  function enforceMinHeights(heights, usable, minH) {
+    const keys = PANEL_KEYS.slice();
+    // loop até todos >= min ou impossível
+    for (let guard = 0; guard < 12; guard++) {
+      let deficit = 0;
+      keys.forEach(k => {
+        if (heights[k] < minH) {
+          deficit += minH - heights[k];
+          heights[k] = minH;
+        }
+      });
+      if (deficit <= 0) break;
+      const donors = keys.filter(k => heights[k] > minH);
+      const donorSum = donors.reduce((a, k) => a + (heights[k] - minH), 0);
+      if (donorSum <= 0) break;
+      donors.forEach(k => {
+        const share = (heights[k] - minH) / donorSum;
+        heights[k] -= Math.floor(deficit * share);
+        if (heights[k] < minH) heights[k] = minH;
+      });
+    }
+    // corrige soma
+    let sum = keys.reduce((a, k) => a + heights[k], 0);
+    if (sum !== usable) {
+      const diff = usable - sum;
+      // ajusta no maior painel
+      let maxK = keys[0];
+      keys.forEach(k => { if (heights[k] > heights[maxK]) maxK = k; });
+      heights[maxK] = Math.max(minH, heights[maxK] + diff);
+    }
+    return heights;
+  }
+
   function applySidebarSplits(splits) {
     const sidebar = document.getElementById('sidebar');
     const props = document.getElementById('properties');
     const logSec = document.getElementById('log-section');
     const valSec = document.getElementById('validation-section');
     const secSec = document.getElementById('security-section');
-    if (!sidebar || !props || !logSec || !valSec) return;
+    if (!sidebar || !props || !logSec || !valSec || !secSec) return;
 
-    // 2 ou 3 splitters (validações + segurança compartilham a fatia "val")
-    const splitterCount = document.querySelectorAll('.sidebar-splitter').length || 2;
-    const totalH = sidebar.clientHeight;
-    const usable = Math.max(0, totalH - SPLITTER_H * splitterCount);
-    if (usable < MIN_PANEL * 3) return;
+    const usable = getSidebarUsableHeight(sidebar);
+    if (usable < MIN_PANEL * 4) return;
 
-    let hProps = Math.round(usable * splits.props);
-    let hLog = Math.round(usable * splits.log);
-    let hValBlock = usable - hProps - hLog;
+    const norm = normalizeSidebarSplits(splits);
+    let heights = {
+      props: Math.round(usable * norm.props),
+      log: Math.round(usable * norm.log),
+      val: Math.round(usable * norm.val),
+      sec: 0
+    };
+    heights.sec = usable - heights.props - heights.log - heights.val;
+    heights = enforceMinHeights(heights, usable, MIN_PANEL);
 
-    // respeita mínimos redistribuindo o excesso
-    if (hProps < MIN_PANEL) {
-      const need = MIN_PANEL - hProps;
-      hProps = MIN_PANEL;
-      if (hLog - need >= MIN_PANEL) hLog -= need;
-      else { hValBlock = Math.max(MIN_PANEL, hValBlock - need); hLog = usable - hProps - hValBlock; }
-    }
-    if (hLog < MIN_PANEL) {
-      const need = MIN_PANEL - hLog;
-      hLog = MIN_PANEL;
-      if (hProps - need >= MIN_PANEL) hProps -= need;
-      else { hValBlock = Math.max(MIN_PANEL, hValBlock - need); hProps = usable - hLog - hValBlock; }
-    }
-    if (hValBlock < MIN_PANEL) {
-      const need = MIN_PANEL - hValBlock;
-      hValBlock = MIN_PANEL;
-      if (hLog - need >= MIN_PANEL) hLog -= need;
-      else { hProps = Math.max(MIN_PANEL, hProps - need); hLog = usable - hProps - hValBlock; }
-    }
+    const apply = (el, h) => {
+      el.style.flex = `0 0 ${h}px`;
+      el.style.height = h + 'px';
+      el.style.minHeight = MIN_PANEL + 'px';
+      el.style.maxHeight = h + 'px';
+      el.style.overflow = 'hidden';
+    };
+    apply(props, heights.props);
+    apply(logSec, heights.log);
+    apply(valSec, heights.val);
+    apply(secSec, heights.sec);
 
-    // corrige soma final
-    const sum = hProps + hLog + hValBlock;
-    if (sum !== usable) hProps += usable - sum;
-
-    // divide o bloco inferior entre validações e segurança
-    let hVal = secSec ? Math.max(MIN_PANEL, Math.round(hValBlock * 0.45)) : hValBlock;
-    let hSec = secSec ? (hValBlock - hVal) : 0;
-    if (secSec && hSec < MIN_PANEL) {
-      hSec = MIN_PANEL;
-      hVal = Math.max(MIN_PANEL, hValBlock - hSec);
-    }
-
-    props.style.flex = `0 0 ${hProps}px`;
-    props.style.height = hProps + 'px';
-    props.style.minHeight = MIN_PANEL + 'px';
-    logSec.style.flex = `0 0 ${hLog}px`;
-    logSec.style.height = hLog + 'px';
-    logSec.style.minHeight = MIN_PANEL + 'px';
-    valSec.style.flex = `0 0 ${hVal}px`;
-    valSec.style.height = hVal + 'px';
-    valSec.style.minHeight = MIN_PANEL + 'px';
-    if (secSec) {
-      secSec.style.flex = `0 0 ${hSec}px`;
-      secSec.style.height = hSec + 'px';
-      secSec.style.minHeight = MIN_PANEL + 'px';
-    }
-
-    const total = hProps + hLog + hValBlock;
+    const total = heights.props + heights.log + heights.val + heights.sec;
     if (total > 0) {
-      splits.props = hProps / total;
-      splits.log = hLog / total;
-      splits.val = hValBlock / total;
+      splits.props = heights.props / total;
+      splits.log = heights.log / total;
+      splits.val = heights.val / total;
+      splits.sec = heights.sec / total;
     }
   }
 
@@ -7038,47 +6726,89 @@
     const sidebar = document.getElementById('sidebar');
     const split1 = document.getElementById('split-props-log');
     const split2 = document.getElementById('split-log-val');
-    if (!sidebar || !split1 || !split2) return;
+    const split3 = document.getElementById('split-val-sec');
+    if (!sidebar || !split1 || !split2 || !split3) return;
 
     const splits = loadSidebarSplits();
     applySidebarSplits(splits);
 
     let drag = null;
 
+    function panelHeightsFromSplits(usable) {
+      const n = normalizeSidebarSplits(splits);
+      let h = {
+        props: Math.round(usable * n.props),
+        log: Math.round(usable * n.log),
+        val: Math.round(usable * n.val),
+        sec: 0
+      };
+      h.sec = usable - h.props - h.log - h.val;
+      return enforceMinHeights(h, usable, MIN_PANEL);
+    }
+
     function onMove(e) {
       if (!drag) return;
-      const totalH = sidebar.clientHeight;
-      const usable = Math.max(0, totalH - SPLITTER_H * 2);
-      if (usable < MIN_PANEL * 3) return;
+      const usable = getSidebarUsableHeight(sidebar);
+      if (usable < MIN_PANEL * 4) return;
 
-      const y = e.clientY;
       const rect = sidebar.getBoundingClientRect();
-      const relY = y - rect.top;
+      const relY = e.clientY - rect.top;
+      const h = panelHeightsFromSplits(usable);
 
       if (drag.which === 1) {
-        // entre propriedades e log
+        // props | log+val+sec
         let hProps = Math.round(relY - SPLITTER_H / 2);
-        hProps = Math.max(MIN_PANEL, Math.min(hProps, usable - MIN_PANEL * 2));
+        hProps = Math.max(MIN_PANEL, Math.min(hProps, usable - MIN_PANEL * 3));
         const rest = usable - hProps;
-        // mantém proporção entre log e val no restante
-        const pair = drag.logRatio + drag.valRatio;
-        let hLog = pair > 0 ? Math.round(rest * (drag.logRatio / pair)) : Math.round(rest / 2);
-        hLog = Math.max(MIN_PANEL, Math.min(hLog, rest - MIN_PANEL));
-        const hVal = rest - hLog;
+        const restRatio = drag.logRatio + drag.valRatio + drag.secRatio;
+        let hLog = restRatio > 0 ? Math.round(rest * (drag.logRatio / restRatio)) : Math.round(rest / 3);
+        let hVal = restRatio > 0 ? Math.round(rest * (drag.valRatio / restRatio)) : Math.round(rest / 3);
+        hLog = Math.max(MIN_PANEL, hLog);
+        hVal = Math.max(MIN_PANEL, hVal);
+        let hSec = rest - hLog - hVal;
+        if (hSec < MIN_PANEL) {
+          const need = MIN_PANEL - hSec;
+          hSec = MIN_PANEL;
+          if (hVal - need >= MIN_PANEL) hVal -= need;
+          else if (hLog - need >= MIN_PANEL) hLog -= need;
+          else {
+            hLog = Math.max(MIN_PANEL, Math.floor((rest - MIN_PANEL) / 2));
+            hVal = Math.max(MIN_PANEL, rest - MIN_PANEL - hLog);
+            hSec = rest - hLog - hVal;
+          }
+        }
         splits.props = hProps / usable;
         splits.log = hLog / usable;
         splits.val = hVal / usable;
-      } else {
-        // entre log e validações
-        const propsH = Math.round(usable * splits.props);
-        let hProps = Math.max(MIN_PANEL, Math.min(propsH, usable - MIN_PANEL * 2));
-        // posição do segundo splitter ≈ hProps + SPLITTER + hLog + SPLITTER/2
+        splits.sec = hSec / usable;
+      } else if (drag.which === 2) {
+        // props+log | val+sec  (splitter entre log e validações)
+        let hProps = Math.max(MIN_PANEL, Math.min(h.props, usable - MIN_PANEL * 3));
         let hLog = Math.round(relY - hProps - SPLITTER_H - SPLITTER_H / 2);
-        hLog = Math.max(MIN_PANEL, Math.min(hLog, usable - hProps - MIN_PANEL));
-        const hVal = usable - hProps - hLog;
+        hLog = Math.max(MIN_PANEL, Math.min(hLog, usable - hProps - MIN_PANEL * 2));
+        const rest = usable - hProps - hLog;
+        const pair = drag.valRatio + drag.secRatio;
+        let hVal = pair > 0 ? Math.round(rest * (drag.valRatio / pair)) : Math.round(rest / 2);
+        hVal = Math.max(MIN_PANEL, Math.min(hVal, rest - MIN_PANEL));
+        const hSec = rest - hVal;
         splits.props = hProps / usable;
         splits.log = hLog / usable;
         splits.val = hVal / usable;
+        splits.sec = hSec / usable;
+      } else {
+        // props+log+val | sec  (splitter entre validações e segurança)
+        let hProps = Math.max(MIN_PANEL, Math.min(h.props, usable - MIN_PANEL * 3));
+        let hLog = Math.max(MIN_PANEL, Math.min(h.log, usable - hProps - MIN_PANEL * 2));
+        // posição do 3º splitter
+        let hVal = Math.round(
+          relY - hProps - hLog - SPLITTER_H * 2 - SPLITTER_H / 2
+        );
+        hVal = Math.max(MIN_PANEL, Math.min(hVal, usable - hProps - hLog - MIN_PANEL));
+        const hSec = usable - hProps - hLog - hVal;
+        splits.props = hProps / usable;
+        splits.log = hLog / usable;
+        splits.val = hVal / usable;
+        splits.sec = hSec / usable;
       }
       applySidebarSplits(splits);
     }
@@ -7095,11 +6825,13 @@
 
     function startDrag(which, el, e) {
       e.preventDefault();
+      e.stopPropagation();
       drag = {
         which,
         el,
         logRatio: splits.log,
-        valRatio: splits.val
+        valRatio: splits.val,
+        secRatio: splits.sec
       };
       el.classList.add('active');
       document.body.classList.add('sidebar-resizing');
@@ -7109,6 +6841,10 @@
 
     split1.addEventListener('mousedown', e => startDrag(1, split1, e));
     split2.addEventListener('mousedown', e => startDrag(2, split2, e));
+    split3.addEventListener('mousedown', e => startDrag(3, split3, e));
+
+    // título do splitter de segurança
+    split3.title = 'Arraste para redimensionar Segurança / Validações';
 
     window.addEventListener('resize', () => applySidebarSplits(splits));
   }
@@ -7204,14 +6940,6 @@
   document.getElementById('btn-cancel-sim').onclick = closeModal;
   document.getElementById('btn-send-sim').onclick = simulateSend;
 
-  document.getElementById('btn-toggle-sidebar').onclick = () => toggleSidebar();
-  document.getElementById('btn-hide-sidebar').onclick = () => setSidebarCollapsed(true);
-  document.getElementById('btn-show-sidebar').onclick = () => setSidebarCollapsed(false);
-  document.getElementById('btn-demo-painel').onclick = () => startDemoPainel({ force: true });
-  document.getElementById('btn-demo-hide').onclick = () => setSidebarCollapsed(true);
-  document.getElementById('btn-demo-show').onclick = () => setSidebarCollapsed(false);
-  document.getElementById('btn-demo-close').onclick = () => closeDemoPainelGuide();
-
   document.getElementById('btn-sim-pause').onclick = () => playback.pause();
   document.getElementById('btn-sim-play').onclick = () => playback.play();
   document.getElementById('btn-sim-stop').onclick = () => {
@@ -7288,12 +7016,6 @@
     if (!typing && (e.ctrlKey || e.metaKey) && e.key.toLowerCase() === 'a') {
       e.preventDefault();
       selectAllDevices();
-      return;
-    }
-
-    if (!typing && (e.ctrlKey || e.metaKey) && e.key.toLowerCase() === 'b') {
-      e.preventDefault();
-      toggleSidebar();
       return;
     }
 
@@ -7380,31 +7102,22 @@
   loadLog();
   renderLog();
   initSidebarResize();
-  loadSidebarCollapsed();
   applyViewTransform();
 
-  const params = new URLSearchParams(window.location.search || '');
-  const wantDemoPainel = (params.get('demo') || '').toLowerCase() === 'painel';
-
-  if (wantDemoPainel) {
-    startDemoPainel({ force: false });
+  const restored = loadTopology();
+  if (restored) {
+    log('Topologia anterior restaurada. Continue de onde parou.', 'ok');
+    log(`Restaurados: ${state.devices.length} dispositivo(s) e ${state.links.length} ligação(ões).`, 'info');
   } else {
-    const restored = loadTopology();
-    if (restored) {
-      log('Topologia anterior restaurada. Continue de onde parou.', 'ok');
-      log(`Restaurados: ${state.devices.length} dispositivo(s) e ${state.links.length} ligação(ões).`, 'info');
-    } else {
-      log('Simulador pronto com validações de topologia (estilo Packet Tracer).', 'info');
-      log('Use "Validar" para checar IPs, cabos, loops, rotas e DHCP. "Simular Mensagem" segue o fluxo completo de envio.', 'info');
-      log('DHCP: adicione + DHCP, configure escopo (range, máscara, gateway, DNS, lease). Nos hosts, modo DHCP → Obter IP.', 'info');
-      log('Renovação: na metade do lease (T1) o host pede renovação sozinho, com animação no quadro.', 'info');
-      log('Dica: clique em ▶ Exemplo painel para testar esconder/mostrar o painel lateral.', 'info');
-    }
+    log('Simulador pronto com validações de topologia (estilo Packet Tracer).', 'info');
+    log('Use "Validar" para checar IPs, cabos, loops, rotas e DHCP. "Simular Mensagem" segue o fluxo completo de envio.', 'info');
+    log('DHCP: adicione + DHCP, configure escopo (range, máscara, gateway, DNS, lease). Nos hosts, modo DHCP → Obter IP.', 'info');
+    log('Renovação: na metade do lease (T1) o host pede renovação sozinho, com animação no quadro.', 'info');
   }
   ensureDhcpLeaseMonitor();
   log('Quadro: scroll = zoom · arrastar fundo = mover visão · Ctrl+A = selecionar tudo e arrastar o grupo.', 'info');
   updateSaveStatus();
-  if (!wantDemoPainel) runValidation(false);
+  runValidation(false);
 })();
 </script>
 </body>
