@@ -11,6 +11,7 @@ Simulador didático (estilo Packet Tracer) para montar topologias, configurar IP
 - **Renovação T1:** na metade do lease o host renova automaticamente (REQUEST → ACK animado)
 - **ISP:** interliga sites de clientes; **IPs manuais no laboratório**; peering ISP↔ISP; atalhos /30 opcionais; rotas propagadas pela nuvem
 - **Regiões:** círculos coloridos só para marcar áreas no lab (ex.: Norte/Sul) — não afetam a rede
+- **🔒 Segurança básica:** auditoria de senhas, Wi-Fi (WPA/WPA2/WPA3), firewall, atualizações, Wi-Fi públicas e proteção dos equipamentos — falhas em **vermelho**
 
 ## Como usar (GitHub Pages)
 
@@ -44,12 +45,30 @@ Abra o site publicado (após ativar o Pages) ou o arquivo `index.html` / `simula
 3. Configure o peering **à mão** (ex.: `200.255.0.1` ↔ `200.255.0.2` `/30`)  
 4. Sites se alcançam: HostA → R1 → ISP1 → ISP2 → R2 → HostB
 
+### Atividade Segurança básica (sugestão)
+
+1. Monte (ou **importe**) uma topologia com hosts + roteador  
+2. Em cada **Host** e **Roteador**, configure o bloco **🔒 Segurança** no painel  
+3. Clique em **🔒 Segurança** na barra (ou **Auditar** no painel lateral)  
+4. Corrija os itens em **vermelho** até o badge ficar **OK**  
+5. Labs prontos com falhas plantadas: pasta [`labs-seguranca/`](./labs-seguranca/)
+
+### Gancho: arquivo secreto → teste de invasão → firewall
+
+1. No **Host**, o aluno cria um **arquivo secreto** (nome + conteúdo) e salva  
+2. Professor: **🎯 Teste de invasão** → escolhe o PC → tenta obter o arquivo  
+3. **Firewall OFF** = professor lê o arquivo = **rede falhou** (vermelho)  
+4. Aluno liga o **firewall do host** e retesta = ataque bloqueado (verde)  
+5. Aí você entra na teoria de **firewall** (e depois no roteador)
+
 ## Arquivos
 
 | Arquivo | Descrição |
 |---------|-----------|
 | `index.html` | Entrada do site (GitHub Pages) |
 | `simulador-topologia-rede.html` | Simulador completo |
+| `labs-erros/` | Labs de IP/ISP com erros plantados |
+| `labs-seguranca/` | Labs de segurança básica (importar + auditar) |
 | `imgs/` | Ícones de switch e roteador |
 
 ## Desenvolvimento
