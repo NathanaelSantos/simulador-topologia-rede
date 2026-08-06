@@ -409,10 +409,10 @@
       opacity: 0.9;
       margin-top: 2px;
     }
-    /* Regiões (círculos coloridos — só visual, não afetam rede) */
+    /* Regiões (quadrados coloridos — só visual, não afetam rede) */
     .region {
       position: absolute;
-      border-radius: 50%;
+      border-radius: 10px;
       z-index: 0;
       pointer-events: auto;
       cursor: grab;
@@ -442,11 +442,11 @@
     }
     .region-resize {
       position: absolute;
-      right: 10%;
-      bottom: 10%;
-      width: 16px;
-      height: 16px;
-      border-radius: 50%;
+      right: 4px;
+      bottom: 4px;
+      width: 14px;
+      height: 14px;
+      border-radius: 3px;
       background: #fff;
       border: 2px solid #334155;
       cursor: nwse-resize;
@@ -464,7 +464,7 @@
     .region-swatch {
       width: 28px;
       height: 28px;
-      border-radius: 50%;
+      border-radius: 6px;
       border: 2px solid #fff;
       box-shadow: 0 0 0 1px #cbd5e1;
       cursor: pointer;
@@ -473,6 +473,18 @@
     .region-swatch.active {
       box-shadow: 0 0 0 2px #1d4ed8;
       transform: scale(1.08);
+    }
+    .canvas-container.place-region-mode {
+      cursor: crosshair;
+    }
+    .canvas-container.place-region-mode .device {
+      pointer-events: none;
+      opacity: 0.85;
+    }
+    .connect-banner.place-region {
+      background: linear-gradient(135deg, #1d4ed8, #3b82f6);
+      border-color: #60a5fa;
+      box-shadow: 0 8px 24px rgba(37, 99, 235, 0.28);
     }
 
     #connections {
@@ -1035,7 +1047,7 @@
     <button id="btn-router">+ Roteador</button>
     <button id="btn-isp" title="ISP / Nuvem Internet — interliga redes de clientes via WAN">+ ISP</button>
     <button id="btn-dhcp" title="Servidor DHCP — distribuição automática de IPs">+ DHCP</button>
-    <button id="btn-region" class="secondary" title="Círculo colorido só para marcar regiões (não afeta a rede)">+ Região</button>
+    <button id="btn-region" class="secondary" title="Quadrado colorido só para marcar regiões (não afeta a rede). Clique no quadro para criar.">+ Região</button>
     <div class="toolbar-sep"></div>
     <button id="btn-connect" class="secondary" title="Ativa o modo de ligação entre dispositivos">🔌 Modo Conectar</button>
     <button id="btn-select-all" class="secondary" title="Seleciona todos os dispositivos (Ctrl+A)">▣ Selecionar tudo</button>
@@ -1108,7 +1120,7 @@
         </div>
       </div>
       <div class="connect-banner" id="connect-banner">
-        🔌 MODO LIGAÇÃO ATIVO
+        <span id="connect-banner-title">🔌 MODO LIGAÇÃO ATIVO</span>
         <div class="step" id="connect-step">Clique no primeiro dispositivo</div>
       </div>
       <div class="canvas-controls" id="canvas-controls">
@@ -1293,9 +1305,9 @@
     { id: 'orange', hex: '#f97316', name: 'Laranja' },
     { id: 'slate',  hex: '#64748b', name: 'Cinza' }
   ];
-  const REGION_MIN_R = 120;
+  const REGION_MIN_R = 80;
   const REGION_MAX_R = 1400;
-  const REGION_DEFAULT_R = 360; // ~720px de diâmetro — cobre um site com vários dispositivos
+  const REGION_DEFAULT_R = 180; // metade do lado (~360px) — quadrado didático para um site
 
   const VIEW_ZOOM_MIN = 0.25;
   const VIEW_ZOOM_MAX = 3;
@@ -3484,18 +3496,35 @@
   function updateConnectUI() {
     const canvas = document.getElementById('canvas');
     const banner = document.getElementById('connect-banner');
+    const bannerTitle = document.getElementById('connect-banner-title');
     const step = document.getElementById('connect-step');
     const btn = document.getElementById('btn-connect');
+    const btnRegion = document.getElementById('btn-region');
     const isConnect = state.mode === 'connect';
+    const isPlaceRegion = state.mode === 'place-region';
 
     canvas.classList.toggle('connect-mode', isConnect);
-    banner.classList.toggle('show', isConnect);
+    canvas.classList.toggle('place-region-mode', isPlaceRegion);
+    banner.classList.toggle('show', isConnect || isPlaceRegion);
+    banner.classList.toggle('place-region', isPlaceRegion);
     btn.classList.toggle('active', isConnect);
     btn.textContent = isConnect ? '✓ Ligando… (clique p/ sair)' : '🔌 Modo Conectar';
+    if (btnRegion) {
+      btnRegion.classList.toggle('active', isPlaceRegion);
+      btnRegion.textContent = isPlaceRegion ? '✓ Posicione no quadro…' : '+ Região';
+    }
 
     document.querySelectorAll('.device').forEach(el => {
       el.classList.remove('connect-from', 'connect-target-hint');
     });
+
+    if (isPlaceRegion) {
+      if (bannerTitle) bannerTitle.textContent = '▢ CRIAR REGIÃO (quadrado)';
+      step.textContent = 'Clique no quadro para posicionar · Esc cancela · nada aparece até você clicar';
+      return;
+    }
+
+    if (bannerTitle) bannerTitle.textContent = '🔌 MODO LIGAÇÃO ATIVO';
 
     if (!isConnect) return;
 
@@ -3518,6 +3547,16 @@
     state.mode = mode;
     state.connectFrom = null;
     updateConnectUI();
+  }
+
+  function startPlaceRegionMode() {
+    if (state.mode === 'place-region') {
+      setMode('select');
+      log('Criação de região cancelada.', 'info');
+      return;
+    }
+    setMode('place-region');
+    log('Modo criar região: clique no quadro para posicionar o quadrado. Esc cancela.', 'action');
   }
 
   // ========== PERSISTÊNCIA ==========
@@ -3701,7 +3740,7 @@
     runValidation(false);
   }
 
-  // ========== REGIÕES (círculos coloridos — só visual) ==========
+  // ========== REGIÕES (quadrados coloridos — só visual) ==========
   function getRegion(id) {
     return state.regions.find(r => r.id === id) || null;
   }
@@ -3717,23 +3756,25 @@
     return `rgba(${r},${g},${b},${alpha})`;
   }
 
-  function createRegion() {
+  /** Cria região só quando o usuário clica no quadro (não aparece sozinha). radius = metade do lado do quadrado. */
+  function createRegion(atX, atY) {
     const id = 'reg' + state.nextId++;
     const count = state.regions.length + 1;
     const color = REGION_COLORS[(count - 1) % REGION_COLORS.length].hex;
     const region = {
       id,
       label: 'Região ' + count,
-      x: 220 + (count % 4) * 40,
-      y: 180 + (count % 3) * 30,
+      x: typeof atX === 'number' ? atX : 220 + (count % 4) * 40,
+      y: typeof atY === 'number' ? atY : 180 + (count % 3) * 30,
       radius: REGION_DEFAULT_R,
       color
     };
     state.regions.push(region);
     renderRegion(region);
     selectRegion(id);
-    log(`Região "${region.label}" adicionada (só visual — não afeta cabos nem rotas). Arraste, redimensione e escolha a cor.`, 'action');
+    log(`Região "${region.label}" criada (quadrado só visual — não afeta cabos nem rotas). Arraste, redimensione ou exclua.`, 'action');
     markDirty();
+    return region;
   }
 
   function renderAllRegions() {
@@ -3772,7 +3813,7 @@
       if (e.button !== 0) return;
       if (e.target.classList.contains('region-resize')) return;
       e.stopPropagation();
-      if (state.mode === 'connect') return;
+      if (state.mode === 'connect' || state.mode === 'place-region') return;
       selectRegion(region.id);
       const world = screenToWorld(e.clientX, e.clientY);
       state.dragging = {
@@ -3791,7 +3832,7 @@
       if (e.button !== 0) return;
       e.stopPropagation();
       e.preventDefault();
-      if (state.mode === 'connect') return;
+      if (state.mode === 'connect' || state.mode === 'place-region') return;
       selectRegion(region.id);
       const world = screenToWorld(e.clientX, e.clientY);
       state.dragging = {
@@ -3808,7 +3849,7 @@
 
     el.addEventListener('click', e => {
       e.stopPropagation();
-      if (state.mode === 'connect') return;
+      if (state.mode === 'connect' || state.mode === 'place-region') return;
       selectRegion(region.id);
     });
 
@@ -4746,8 +4787,9 @@
       const r = getRegion(state.dragging.id);
       if (!r) return;
       const c = state.dragging.center;
-      const dist = Math.hypot(world.x - c.x, world.y - c.y);
-      const next = Math.max(REGION_MIN_R, Math.min(REGION_MAX_R, dist));
+      // quadrado: tamanho = metade do lado, baseado no canto (max |dx|,|dy|)
+      const half = Math.max(Math.abs(world.x - c.x), Math.abs(world.y - c.y));
+      const next = Math.max(REGION_MIN_R, Math.min(REGION_MAX_R, half));
       if (Math.abs(next - r.radius) > 0.5) state.dragging.moved = true;
       r.radius = next;
       updateRegionPosition(r);
@@ -4900,12 +4942,13 @@
       if (!region) {
         state.selectedRegionId = null;
       } else {
+        const side = Math.round(region.radius * 2);
         let html = `<h3>${escapeHtml(region.label)} <span style="color:#64748b;font-weight:400;font-size:0.8rem;">(região — só visual)</span></h3>`;
-        html += `<p class="hint">Círculos de cor marcam áreas no laboratório (ex.: Norte, Sul, Datacenter). <strong>Não</strong> alteram cabos, IPs nem rotas.</p>`;
+        html += `<p class="hint">Quadrados de cor marcam áreas no laboratório (ex.: Norte, Sul, Datacenter). <strong>Não</strong> alteram cabos, IPs nem rotas.</p>`;
         html += `<label>Nome da região</label>
                  <input type="text" id="prop-region-label" value="${escapeHtml(region.label)}" placeholder="Ex.: Região Norte">`;
-        html += `<label>Raio (tamanho)</label>
-                 <input type="number" id="prop-region-radius" min="${REGION_MIN_R}" max="${REGION_MAX_R}" value="${Math.round(region.radius)}">`;
+        html += `<label>Tamanho do lado (px)</label>
+                 <input type="number" id="prop-region-side" min="${REGION_MIN_R * 2}" max="${REGION_MAX_R * 2}" value="${side}">`;
         html += `<label>Cor</label>
                  <div class="region-color-swatches" id="region-swatches">`;
         REGION_COLORS.forEach(c => {
@@ -4915,14 +4958,17 @@
         html += `</div>`;
         html += `<label style="margin-top:10px">Cor personalizada</label>
                  <input type="color" id="prop-region-color" value="${region.color || '#3b82f6'}">`;
-        html += `<p class="hint">Arraste o círculo para mover · bolinha no canto para redimensionar · Excluir remove a região.</p>`;
-        html += `<button id="btn-save-props" style="width:100%;margin-top:14px;">Salvar região</button>`;
+        html += `<p class="hint">Arraste o quadrado para mover · puxador no canto inferior direito para redimensionar · <strong>Excluir</strong> ou tecla Delete remove.</p>`;
+        html += `<div class="prop-actions" style="margin-top:14px;">
+          <button type="button" id="btn-save-props" style="width:100%;">Salvar região</button>
+          <button type="button" id="btn-delete-region" class="danger" style="width:100%;">🗑 Excluir região</button>
+        </div>`;
         panel.innerHTML = html;
         document.getElementById('btn-save-props').onclick = () => {
           const label = document.getElementById('prop-region-label').value.trim() || region.label;
-          let radius = parseInt(document.getElementById('prop-region-radius').value, 10);
-          if (Number.isNaN(radius)) radius = region.radius;
-          radius = Math.max(REGION_MIN_R, Math.min(REGION_MAX_R, radius));
+          let sidePx = parseInt(document.getElementById('prop-region-side').value, 10);
+          if (Number.isNaN(sidePx)) sidePx = region.radius * 2;
+          const radius = Math.max(REGION_MIN_R, Math.min(REGION_MAX_R, sidePx / 2));
           const color = document.getElementById('prop-region-color').value || region.color;
           region.label = label;
           region.radius = radius;
@@ -4932,6 +4978,11 @@
           log(`Região "${region.label}" atualizada.`, 'ok');
           markDirty();
           renderProperties();
+        };
+        document.getElementById('btn-delete-region').onclick = () => {
+          if (confirm(`Excluir a região "${region.label}"?`)) {
+            deleteSelectedRegion();
+          }
         };
         document.querySelectorAll('.region-swatch').forEach(btn => {
           btn.onclick = () => {
@@ -4986,7 +5037,7 @@
         <p class="hint" style="margin-top:8px;">📦 <strong>DHCP:</strong> + DHCP → configure pool → no host, modo DHCP → Obter IP. Use Validar e Simular Mensagem para testar.</p>
         <p class="hint" style="margin-top:8px;">☁️ <strong>ISP (lab manual):</strong> ligue cabos → configure IP/máscara em cada PE e na WAN do roteador (mesma sub-rede). Peering = ISP↔ISP. Auto /30 só se quiser (botões no ISP).</p>
         <p class="hint" style="margin-top:8px;">🔒 <strong>Segurança:</strong> em Host/Roteador configure senhas, Wi-Fi (WPA2/WPA3), firewall e atualizações → clique em <strong>🔒 Segurança</strong>. Falhas em vermelho; OK = rede segura no checklist básico. Labs: pasta <code>labs-seguranca/</code>.</p>
-        <p class="hint" style="margin-top:8px;">⬤ <strong>Região:</strong> + Região → círculo colorido para marcar áreas (Norte, Sul…). Só visual; arraste e redimensione.</p>
+        <p class="hint" style="margin-top:8px;">▢ <strong>Região:</strong> + Região → clique no quadro para criar o quadrado (Norte, Sul…). Só visual; arraste, redimensione ou exclua.</p>
         <p class="hint" style="margin-top:8px;">Zoom: scroll no quadro · Mover visão: arraste o fundo · Selecionar tudo: Ctrl+A</p>`;
       return;
     }
@@ -6566,12 +6617,16 @@
   }
 
   // ========== EVENTOS ==========
-  document.getElementById('btn-host').onclick = () => createDevice('host');
-  document.getElementById('btn-switch').onclick = () => createDevice('switch');
-  document.getElementById('btn-router').onclick = () => createDevice('router');
-  document.getElementById('btn-isp').onclick = () => createDevice('isp');
-  document.getElementById('btn-dhcp').onclick = () => createDevice('dhcp');
-  document.getElementById('btn-region').onclick = () => createRegion();
+  function addDeviceFromToolbar(type) {
+    if (state.mode === 'place-region' || state.mode === 'connect') setMode('select');
+    createDevice(type);
+  }
+  document.getElementById('btn-host').onclick = () => addDeviceFromToolbar('host');
+  document.getElementById('btn-switch').onclick = () => addDeviceFromToolbar('switch');
+  document.getElementById('btn-router').onclick = () => addDeviceFromToolbar('router');
+  document.getElementById('btn-isp').onclick = () => addDeviceFromToolbar('isp');
+  document.getElementById('btn-dhcp').onclick = () => addDeviceFromToolbar('dhcp');
+  document.getElementById('btn-region').onclick = () => startPlaceRegionMode();
 
   document.getElementById('btn-connect').onclick = () => {
     if (state.mode === 'connect') {
@@ -6648,8 +6703,21 @@
   const canvasEl = document.getElementById('canvas');
 
   canvasEl.addEventListener('click', e => {
-    if (e.target.closest('.device') || e.target.closest('.region') || e.target.closest('.canvas-controls') || e.target.closest('#transform-panel')) return;
+    if (e.target.closest('.canvas-controls') || e.target.closest('#transform-panel')) return;
     if (e.target.closest('.link-hit') || e.target.closest('.link-group')) return;
+
+    // Criar região só no clique do usuário no quadro (não nasce sozinha)
+    if (state.mode === 'place-region') {
+      if (e.target.closest('button')) return;
+      e.preventDefault();
+      e.stopPropagation();
+      const world = screenToWorld(e.clientX, e.clientY);
+      createRegion(world.x, world.y);
+      setMode('select');
+      return;
+    }
+
+    if (e.target.closest('.device') || e.target.closest('.region')) return;
     if (state.mode !== 'connect' && !state.dragging) {
       state.selectedLinkId = null;
       state.selectedRegionId = null;
@@ -6659,6 +6727,8 @@
 
   canvasEl.addEventListener('mousedown', e => {
     if (e.target.closest('.device') || e.target.closest('.region') || e.target.closest('.canvas-controls') || e.target.closest('#transform-panel') || e.target.closest('button')) return;
+    // no modo colocar região, clique esquerdo posiciona — não faz pan
+    if (state.mode === 'place-region' && e.button === 0 && !state.spaceDown && !e.altKey) return;
     // botão do meio, Espaço+clique, Alt+clique ou arraste no fundo: pan
     if (e.button === 1 || (e.button === 0 && (state.spaceDown || e.altKey || state.mode !== 'connect'))) {
       if (state.mode === 'connect' && e.button === 0 && !state.spaceDown && !e.altKey) return;
@@ -6719,7 +6789,7 @@
     }
 
     if (!typing && (e.key === 'Delete' || e.key === 'Backspace') &&
-        (state.selectedIds.length || state.selectedLinkId)) {
+        (state.selectedIds.length || state.selectedLinkId || state.selectedRegionId)) {
       // não apagar ao digitar em campos — já coberto por typing
       e.preventDefault();
       deleteSelectedDevices();
@@ -6732,6 +6802,11 @@
         playback.stop();
         return;
       }
+      if (state.mode === 'place-region') {
+        setMode('select');
+        log('Criação de região cancelada (Esc).', 'info');
+        return;
+      }
       if (state.mode === 'connect') {
         if (state.connectFrom) {
           state.connectFrom = null;
@@ -6742,6 +6817,10 @@
           updateLinks();
           log('Modo SELEÇÃO ativado (Esc).', 'info');
         }
+      } else if (state.selectedRegionId) {
+        state.selectedRegionId = null;
+        updateRegionSelectionUI();
+        renderProperties();
       } else if (state.selectedIds.length) {
         selectDevice(null);
       }

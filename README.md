@@ -10,7 +10,7 @@ Simulador didático (estilo Packet Tracer) para montar topologias, configurar IP
 - **DHCP:** escopo, range, máscara, gateway, DNS, lease
 - **Renovação T1:** na metade do lease o host renova automaticamente (REQUEST → ACK animado)
 - **ISP:** interliga sites de clientes; **IPs manuais no laboratório**; peering ISP↔ISP; atalhos /30 opcionais; rotas propagadas pela nuvem
-- **Regiões:** círculos coloridos só para marcar áreas no lab (ex.: Norte/Sul) — não afetam a rede
+- **Regiões:** quadrados coloridos só para marcar áreas no lab (ex.: Norte/Sul) — crie com + Região (clique no quadro), arraste/redimensione e exclua — não afetam a rede
 - **🔒 Segurança básica:** auditoria de senhas, Wi-Fi (WPA/WPA2/WPA3), firewall, atualizações, Wi-Fi públicas e proteção dos equipamentos — falhas em **vermelho**
 
 ## Como usar (GitHub Pages)
