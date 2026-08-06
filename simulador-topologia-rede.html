@@ -83,14 +83,94 @@
     .main {
       display: flex;
       height: calc(100vh - 52px);
+      position: relative;
     }
     .sidebar {
       width: 340px;
+      min-width: 340px;
       background: #ffffff;
       border-right: 1px solid #e2e8f0;
       display: flex;
       flex-direction: column;
       overflow: hidden;
+      transition: width 0.2s ease, min-width 0.2s ease, opacity 0.15s ease, border-color 0.15s;
+      position: relative;
+      z-index: 4;
+    }
+    body.sidebar-collapsed .sidebar {
+      width: 0;
+      min-width: 0;
+      opacity: 0;
+      border-right-color: transparent;
+      pointer-events: none;
+    }
+    .sidebar-toggle-bar {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 8px;
+      padding: 6px 10px;
+      border-bottom: 1px solid #e2e8f0;
+      background: #f8fafc;
+      flex-shrink: 0;
+    }
+    .sidebar-toggle-bar span {
+      font-size: 0.72rem;
+      font-weight: 600;
+      color: #475569;
+      letter-spacing: 0.02em;
+    }
+    .sidebar-toggle-bar button {
+      padding: 4px 10px;
+      font-size: 0.72rem;
+      background: #e2e8f0;
+      color: #334155;
+    }
+    .sidebar-toggle-bar button:hover {
+      background: #cbd5e1;
+      color: #1e293b;
+    }
+    #btn-toggle-sidebar {
+      margin-left: auto;
+    }
+    #btn-toggle-sidebar.secondary.active {
+      background: #e2e8f0;
+      color: #334155;
+      box-shadow: none;
+      animation: none;
+    }
+    .sidebar-show-tab {
+      display: none;
+      position: absolute;
+      left: 0;
+      top: 50%;
+      z-index: 40;
+      writing-mode: vertical-rl;
+      text-orientation: mixed;
+      background: #1d4ed8;
+      color: #fff;
+      border: none;
+      border-radius: 0 8px 8px 0;
+      padding: 16px 9px;
+      font-size: 0.78rem;
+      font-weight: 600;
+      letter-spacing: 0.06em;
+      box-shadow: 2px 2px 12px rgba(15, 23, 42, 0.18);
+      cursor: pointer;
+      line-height: 1.2;
+      transform: translateY(-50%);
+    }
+    body.sidebar-collapsed .sidebar-show-tab {
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+    }
+    .sidebar-show-tab:hover {
+      background: #1e40af;
+    }
+    .sidebar-show-tab:focus-visible {
+      outline: 2px solid #93c5fd;
+      outline-offset: 2px;
     }
     .properties {
       padding: 14px;
@@ -1120,10 +1200,17 @@
     <button id="btn-security" class="warn-btn" title="Audita senhas, Wi-Fi, firewall e atualizações">🔒 Segurança</button>
     <button id="btn-attack" class="danger" title="Teste didático: tenta obter o arquivo secreto do host (gancho para firewall)">🎯 Teste de invasão</button>
     <button id="btn-simulate">📤 Simular Mensagem</button>
+    <div class="toolbar-sep"></div>
+    <button id="btn-toggle-sidebar" class="secondary" type="button" title="Esconder ou mostrar o painel lateral (Ctrl+B)">☰ Painel</button>
   </div>
 
   <div class="main">
+    <button type="button" class="sidebar-show-tab" id="btn-show-sidebar" title="Mostrar painel lateral (Ctrl+B)">Painel ›</button>
     <div class="sidebar" id="sidebar">
+      <div class="sidebar-toggle-bar">
+        <span>Painel lateral</span>
+        <button type="button" id="btn-hide-sidebar" title="Esconder painel (Ctrl+B)">« Esconder</button>
+      </div>
       <div class="properties" id="properties">
         <p style="color:#64748b;font-size:0.85rem;">Selecione um dispositivo para configurar endereçamento IP, máscara e gateway.</p>
         <p class="hint">Dica: hosts (estático ou DHCP), servidor DHCP, roteadores, <strong>ISP (nuvem Internet)</strong> e switches (L2).</p>
@@ -6589,6 +6676,66 @@
 
   // ========== SIDEBAR REDIMENSIONÁVEL ==========
   const SIDEBAR_SPLIT_KEY = 'sft_redes_sidebar_split_v1';
+  const SIDEBAR_COLLAPSED_KEY = 'sft_redes_sidebar_collapsed_v1';
+
+  function isSidebarCollapsed() {
+    return document.body.classList.contains('sidebar-collapsed');
+  }
+
+  function updateSidebarToggleUI() {
+    const collapsed = isSidebarCollapsed();
+    const btnToolbar = document.getElementById('btn-toggle-sidebar');
+    const btnHide = document.getElementById('btn-hide-sidebar');
+    if (btnToolbar) {
+      btnToolbar.textContent = collapsed ? '☰ Mostrar painel' : '☰ Esconder painel';
+      btnToolbar.setAttribute('aria-pressed', collapsed ? 'true' : 'false');
+      btnToolbar.title = collapsed
+        ? 'Mostrar painel lateral (Ctrl+B)'
+        : 'Esconder painel lateral (Ctrl+B)';
+    }
+    if (btnHide) {
+      btnHide.textContent = '« Esconder';
+    }
+    const showTab = document.getElementById('btn-show-sidebar');
+    if (showTab) {
+      showTab.setAttribute('aria-hidden', collapsed ? 'false' : 'true');
+    }
+  }
+
+  function setSidebarCollapsed(collapsed, { silent = false, persist = true } = {}) {
+    document.body.classList.toggle('sidebar-collapsed', !!collapsed);
+    if (persist) {
+      try {
+        localStorage.setItem(SIDEBAR_COLLAPSED_KEY, collapsed ? '1' : '0');
+      } catch (_) { /* ignore */ }
+    }
+    updateSidebarToggleUI();
+    if (!silent) {
+      log(collapsed
+        ? 'Painel lateral escondido. Use «Painel ›» ou Ctrl+B para mostrar.'
+        : 'Painel lateral visível.', 'info');
+    }
+    // recálculo de splits quando reabre
+    if (!collapsed) {
+      try {
+        window.dispatchEvent(new Event('resize'));
+      } catch (_) { /* ignore */ }
+    }
+  }
+
+  function toggleSidebar() {
+    setSidebarCollapsed(!isSidebarCollapsed());
+  }
+
+  function loadSidebarCollapsed() {
+    try {
+      const raw = localStorage.getItem(SIDEBAR_COLLAPSED_KEY);
+      if (raw === '1') setSidebarCollapsed(true, { silent: true, persist: false });
+      else setSidebarCollapsed(false, { silent: true, persist: false });
+    } catch (_) {
+      setSidebarCollapsed(false, { silent: true, persist: false });
+    }
+  }
   const SPLITTER_H = 6;
   const MIN_PANEL = 56;
 
@@ -6860,6 +7007,10 @@
   document.getElementById('btn-cancel-sim').onclick = closeModal;
   document.getElementById('btn-send-sim').onclick = simulateSend;
 
+  document.getElementById('btn-toggle-sidebar').onclick = () => toggleSidebar();
+  document.getElementById('btn-hide-sidebar').onclick = () => setSidebarCollapsed(true);
+  document.getElementById('btn-show-sidebar').onclick = () => setSidebarCollapsed(false);
+
   document.getElementById('btn-sim-pause').onclick = () => playback.pause();
   document.getElementById('btn-sim-play').onclick = () => playback.play();
   document.getElementById('btn-sim-stop').onclick = () => {
@@ -6936,6 +7087,12 @@
     if (!typing && (e.ctrlKey || e.metaKey) && e.key.toLowerCase() === 'a') {
       e.preventDefault();
       selectAllDevices();
+      return;
+    }
+
+    if (!typing && (e.ctrlKey || e.metaKey) && e.key.toLowerCase() === 'b') {
+      e.preventDefault();
+      toggleSidebar();
       return;
     }
 
@@ -7022,6 +7179,7 @@
   loadLog();
   renderLog();
   initSidebarResize();
+  loadSidebarCollapsed();
   applyViewTransform();
 
   const restored = loadTopology();
