@@ -1,0 +1,86 @@
+{
+  "version": 2,
+  "savedAt": "2026-08-06T12:00:00.000Z",
+  "lab": {
+    "id": "sec-02",
+    "titulo": "Wi-Fi com WEP e senha fraca",
+    "objetivo": "O roteador usa WEP (obsoleto) e senha fraca. Corrija para WPA2/WPA3 e senha forte.",
+    "errosPlantados": 3,
+    "sucesso": "Wi-Fi em WPA2 ou WPA3 com senha forte; auditoria sem falhas vermelhas."
+  },
+  "nextId": 8,
+  "devices": [
+    {
+      "id": "dev1",
+      "type": "host",
+      "x": 160,
+      "y": 140,
+      "label": "Notebook",
+      "ip": "192.168.5.10",
+      "mask": "255.255.255.0",
+      "gateway": "192.168.5.1",
+      "dns": "1.1.1.1",
+      "ipMode": "static",
+      "dhcpLease": null,
+      "dhcp": null,
+      "interfaces": null,
+      "security": {
+        "password": "NotaBook9x",
+        "updatesEnabled": true,
+        "firewallEnabled": true,
+        "publicWifiAllowed": false
+      }
+    },
+    {
+      "id": "dev2",
+      "type": "switch",
+      "x": 160,
+      "y": 280,
+      "label": "SW1",
+      "ip": "",
+      "mask": null,
+      "gateway": "",
+      "dns": "",
+      "ipMode": null,
+      "dhcpLease": null,
+      "dhcp": null,
+      "interfaces": null,
+      "security": null
+    },
+    {
+      "id": "dev3",
+      "type": "router",
+      "x": 160,
+      "y": 420,
+      "label": "R-WiFi",
+      "ip": "",
+      "mask": null,
+      "gateway": "",
+      "dns": "",
+      "ipMode": null,
+      "dhcpLease": null,
+      "dhcp": null,
+      "interfaces": [
+        { "name": "Gi0/0", "ip": "192.168.5.1", "mask": "255.255.255.0", "linkId": "link2" },
+        { "name": "Gi0/1", "ip": "", "mask": "255.255.255.0", "linkId": null },
+        { "name": "Gi0/2", "ip": "", "mask": "255.255.255.0", "linkId": null },
+        { "name": "Gi0/3", "ip": "", "mask": "255.255.255.0", "linkId": null }
+      ],
+      "security": {
+        "adminPassword": "RouterSeguro99",
+        "updatesEnabled": true,
+        "firewallEnabled": true,
+        "wifiEnabled": true,
+        "wifiSsid": "Casa-WEP",
+        "wifiPassword": "12345678",
+        "wifiProtocol": "wep",
+        "remoteAdmin": false
+      }
+    }
+  ],
+  "links": [
+    { "id": "link1", "from": "dev1", "to": "dev2" },
+    { "id": "link2", "from": "dev2", "to": "dev3" }
+  ],
+  "regions": []
+}

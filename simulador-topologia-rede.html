@@ -2,7 +2,11 @@
 <html lang="pt-BR">
 <head>
   <meta charset="UTF-8">
+  <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
+  <meta http-equiv="Pragma" content="no-cache">
+  <meta http-equiv="Expires" content="0">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <meta name="app-version" content="2026-08-06-seguranca-lab">
   <title>Simulador de Topologia de Rede - UC1</title>
   <style>
     * { box-sizing: border-box; margin: 0; padding: 0; }
@@ -230,12 +234,16 @@
     .val-badge.ok { background: #d1fae5; color: #047857; }
     .val-badge.err { background: #fee2e2; color: #b91c1c; }
     .val-badge.warn { background: #fef3c7; color: #b45309; }
-    #validation-list {
+    #validation-list,
+    #security-list {
       overflow-y: auto;
       flex: 1;
       min-height: 0;
       font-size: 0.68rem;
       line-height: 1.3;
+    }
+    #security-section {
+      border-top: 1px solid #e2e8f0;
     }
     .val-item {
       padding: 3px 6px;
@@ -535,6 +543,12 @@
       outline: 2px solid #ef4444;
       outline-offset: 3px;
       border-radius: 10px;
+    }
+    .device.has-security-issue {
+      outline: 2px solid #b91c1c;
+      outline-offset: 3px;
+      border-radius: 10px;
+      filter: drop-shadow(0 0 6px rgba(185, 28, 28, 0.35));
     }
     .device.has-error.selected {
       outline: 2px solid #ef4444;
@@ -925,15 +939,165 @@
       margin-top: 12px;
       line-height: 1.4;
     }
+    .security-box {
+      margin-top: 12px;
+      padding: 10px;
+      border-radius: 8px;
+      border: 1px solid #fecaca;
+      background: #fff7f7;
+    }
+    .security-box h4 {
+      margin: 0 0 8px;
+      color: #991b1b;
+      font-size: 0.88rem;
+    }
+    .security-box label {
+      font-size: 0.78rem;
+    }
+    .security-box .check-row {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      margin: 6px 0;
+      color: #334155;
+      font-size: 0.82rem;
+    }
+    .security-box .check-row input {
+      width: auto;
+      margin: 0;
+    }
+    .sec-item {
+      padding: 8px 10px;
+      border-radius: 6px;
+      margin-bottom: 6px;
+      font-size: 0.8rem;
+      line-height: 1.4;
+    }
+    .sec-item.err {
+      background: #fef2f2;
+      border: 1px solid #fecaca;
+      color: #991b1b;
+      font-weight: 600;
+    }
+    .sec-item.warn {
+      background: #fffbeb;
+      border: 1px solid #fde68a;
+      color: #92400e;
+    }
+    .sec-item.ok {
+      background: #f0fdf4;
+      border: 1px solid #bbf7d0;
+      color: #166534;
+    }
+    .sec-item .sec-topic {
+      display: block;
+      font-size: 0.7rem;
+      text-transform: uppercase;
+      letter-spacing: 0.04em;
+      opacity: 0.85;
+      margin-bottom: 2px;
+    }
+    .sec-verdict {
+      padding: 10px 12px;
+      border-radius: 8px;
+      margin-bottom: 8px;
+      font-size: 0.82rem;
+      font-weight: 700;
+      line-height: 1.35;
+    }
+    .sec-verdict.pass {
+      background: #ecfdf5;
+      border: 2px solid #10b981;
+      color: #065f46;
+    }
+    .sec-verdict.fail {
+      background: #fef2f2;
+      border: 2px solid #ef4444;
+      color: #991b1b;
+    }
+    .sec-verdict.warn {
+      background: #fffbeb;
+      border: 2px solid #f59e0b;
+      color: #92400e;
+    }
+    .sec-verdict .sec-verdict-sub {
+      display: block;
+      font-weight: 500;
+      font-size: 0.72rem;
+      margin-top: 4px;
+      opacity: 0.95;
+    }
+    .sec-lab-banner {
+      padding: 8px 10px;
+      border-radius: 6px;
+      margin-bottom: 8px;
+      font-size: 0.72rem;
+      line-height: 1.35;
+      background: #eff6ff;
+      border: 1px solid #bfdbfe;
+      color: #1e40af;
+    }
+    .sec-lab-banner strong { display: block; margin-bottom: 2px; font-size: 0.78rem; }
+    .sec-actions {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 4px;
+      margin-bottom: 6px;
+    }
+    .sec-actions button {
+      padding: 3px 8px;
+      font-size: 0.68rem;
+    }
+    .device.has-breach {
+      outline: 2px solid #7f1d1d;
+      outline-offset: 3px;
+      border-radius: 10px;
+      animation: breach-pulse 1s ease-in-out 3;
+    }
     @keyframes breach-pulse {
       0%, 100% { filter: drop-shadow(0 0 0 transparent); }
       50% { filter: drop-shadow(0 0 10px rgba(185, 28, 28, 0.7)); }
+    }
+    .attack-result {
+      margin-top: 12px;
+      padding: 10px 12px;
+      border-radius: 8px;
+      font-size: 0.85rem;
+      line-height: 1.45;
+      display: none;
+    }
+    .attack-result.show { display: block; }
+    .attack-result.fail {
+      background: #fef2f2;
+      border: 1px solid #fecaca;
+      color: #991b1b;
+      font-weight: 600;
+    }
+    .attack-result.pass {
+      background: #f0fdf4;
+      border: 1px solid #bbf7d0;
+      color: #166534;
+      font-weight: 600;
+    }
+    .secret-file-box {
+      margin-top: 8px;
+      padding: 8px;
+      border-radius: 6px;
+      background: #fffbeb;
+      border: 1px dashed #f59e0b;
+    }
+    .secret-file-box strong {
+      display: block;
+      font-size: 0.78rem;
+      color: #92400e;
+      margin-bottom: 6px;
     }
   </style>
 </head>
 <body>
   <div class="toolbar">
     <h1>🖧 Simulador de Topologia de Rede</h1>
+    <span id="app-version-badge" title="Versão publicada" style="font-size:0.68rem;font-weight:700;color:#0f766e;background:#ccfbf1;border:1px solid #99f6e4;border-radius:999px;padding:2px 8px;white-space:nowrap;">v2026-08-06 · segurança</span>
     <button id="btn-host">+ Host</button>
     <button id="btn-switch">+ Switch</button>
     <button id="btn-router">+ Roteador</button>
@@ -953,6 +1117,8 @@
     <span id="save-status" class="save-status">Nada salvo ainda</span>
     <div class="toolbar-sep"></div>
     <button id="btn-validate" class="warn-btn" title="Executa todas as validações da topologia">✔ Validar</button>
+    <button id="btn-security" class="warn-btn" title="Audita senhas, Wi-Fi, firewall e atualizações">🔒 Segurança</button>
+    <button id="btn-attack" class="danger" title="Teste didático: tenta obter o arquivo secreto do host (gancho para firewall)">🎯 Teste de invasão</button>
     <button id="btn-simulate">📤 Simular Mensagem</button>
   </div>
 
@@ -982,6 +1148,28 @@
         </h3>
         <div id="validation-list">
           <div class="val-item ok">Nenhum problema detectado.</div>
+        </div>
+      </div>
+
+      <div class="sidebar-splitter" id="split-val-sec" title="Arraste para redimensionar" role="separator" aria-orientation="horizontal"></div>
+
+      <div class="validation-section" id="security-section">
+        <h3>
+          <span>Segurança <span id="sec-badge" class="val-badge ok">—</span></span>
+        </h3>
+        <div class="sec-actions">
+          <button id="btn-security-side" class="secondary" type="button" title="Roda o checklist de segurança">🔒 Auditar</button>
+          <button id="btn-export-security" class="secondary" type="button" title="Baixa relatório OK/FALHA para entregar ao professor">⬇ Relatório</button>
+        </div>
+        <div id="security-list">
+          <div class="val-item ok">
+            <strong>Fluxo da atividade:</strong>
+            1) Importe o JSON do professor (⬆ Importar) ou monte a rede ·
+            2) Configure 🔒 Segurança em cada Host e Roteador ·
+            3) Clique em <strong>Auditar</strong> ·
+            4) Se OK → rede segura · se falhar → itens em <strong style="color:#b91c1c">vermelho</strong> ·
+            5) Exporte o <strong>Relatório</strong> para entregar.
+          </div>
         </div>
       </div>
     </div>
@@ -1042,6 +1230,30 @@
         <button id="btn-send-sim">Enviar Pacote</button>
       </div>
       <p class="hint">O envio segue o fluxo real: mesma rede → ARP/entrega direta; outra rede → gateway → rota → entrega. Qualquer falha interrompe com a causa exata.</p>
+    </div>
+  </div>
+
+  <!-- Teste de invasão didático (professor) -->
+  <div class="modal-overlay" id="modal-attack">
+    <div class="modal">
+      <h2>🎯 Teste de invasão (didático)</h2>
+      <p class="hint" style="margin-top:0;margin-bottom:12px">
+        O aluno cria um <strong>arquivo secreto</strong> no host.
+        Se o “invasor” (professor) conseguir ler esse arquivo, a rede <strong>falhou</strong> —
+        esse é o gancho para falar de <strong>firewall</strong>.
+      </p>
+      <label>Host-alvo (PC com o arquivo)</label>
+      <select id="attack-target"></select>
+      <div class="modal-actions">
+        <button class="secondary" id="btn-cancel-attack" type="button">Cancelar</button>
+        <button class="danger" id="btn-run-attack" type="button">Tentar obter o arquivo</button>
+      </div>
+      <div id="attack-result" class="attack-result" role="status"></div>
+      <p class="hint">
+        Regra do lab: <strong>firewall do host desligado</strong> → invasão obtém o arquivo (vermelho / falha).
+        <strong>Firewall ligado</strong> → ataque bloqueado (verde / rede resiste).
+        Não é um ataque real — só simulação de aula.
+      </p>
     </div>
   </div>
 
@@ -1143,6 +1355,9 @@
     lastSavedAt: null,
     history: [],
     lastIssues: [],
+    lastSecurityIssues: null,
+    lastSecurityAt: null,
+    currentLab: null,
     view: { zoom: 1, panX: 0, panY: 0 },
     spaceDown: false
   };
@@ -2851,6 +3066,527 @@
     return issues;
   }
 
+  // ========== SEGURANÇA BÁSICA ==========
+  const COMMON_PASSWORDS = new Set([
+    '123456', '12345678', '123456789', 'password', 'senha', 'admin',
+    'admin123', 'root', 'qwerty', 'wifi', 'router', 'mudar123',
+    '1234', 'abc123', 'senha123', 'guest', 'default'
+  ]);
+
+  function defaultSecurity(type) {
+    if (type === 'host') {
+      return {
+        password: '',
+        updatesEnabled: false,
+        firewallEnabled: false,
+        publicWifiAllowed: true,
+        // Arquivo secreto do aluno — alvo do "teste de invasão" (gancho para firewall)
+        secretFileName: '',
+        secretFileContent: '',
+        lastBreachAt: null,
+        lastBreachStolen: null
+      };
+    }
+    if (type === 'router') {
+      return {
+        adminPassword: '',
+        updatesEnabled: false,
+        firewallEnabled: false,
+        wifiEnabled: false,
+        wifiSsid: '',
+        wifiPassword: '',
+        wifiProtocol: 'open', // open | wep | wpa | wpa2 | wpa3
+        remoteAdmin: true
+      };
+    }
+    return null;
+  }
+
+  function ensureSecurity(dev) {
+    if (!dev || (dev.type !== 'host' && dev.type !== 'router')) return null;
+    if (!dev.security || typeof dev.security !== 'object') {
+      dev.security = defaultSecurity(dev.type);
+    } else {
+      const base = defaultSecurity(dev.type);
+      dev.security = { ...base, ...dev.security };
+    }
+    return dev.security;
+  }
+
+  /** Avalia senha: forte o suficiente para o laboratório de segurança básica. */
+  function analyzePassword(pwd) {
+    if (pwd == null || String(pwd).trim() === '') {
+      return { ok: false, level: 'err', reason: 'senha vazia' };
+    }
+    const p = String(pwd).trim();
+    if (COMMON_PASSWORDS.has(p.toLowerCase())) {
+      return { ok: false, level: 'err', reason: 'senha comum/fraca (ex.: admin, 123456)' };
+    }
+    if (p.length < 8) {
+      return { ok: false, level: 'err', reason: 'menos de 8 caracteres' };
+    }
+    const hasLetter = /[a-zA-Zà-úÀ-Ú]/.test(p);
+    const hasDigit = /\d/.test(p);
+    if (!hasLetter || !hasDigit) {
+      return { ok: false, level: 'err', reason: 'precisa de letras e números' };
+    }
+    const hasSpecial = /[^a-zA-Z0-9à-úÀ-Ú]/.test(p);
+    if (p.length < 10 && !hasSpecial) {
+      return { ok: true, level: 'warn', reason: 'aceitável, mas pode ser mais forte' };
+    }
+    return { ok: true, level: 'ok', reason: 'senha forte o suficiente' };
+  }
+
+  /**
+   * Auditoria didática de segurança básica da topologia.
+   * Temas: senhas, Wi-Fi, WPA/WPA2/WPA3, atualizações, firewall,
+   * Wi-Fi pública e proteção dos equipamentos.
+   */
+  function validateSecurity() {
+    const issues = [];
+    const hosts = state.devices.filter(d => d.type === 'host');
+    const routers = state.devices.filter(d => d.type === 'router');
+
+    if (!hosts.length && !routers.length) {
+      issues.push({
+        level: 'warn',
+        topic: 'Topologia',
+        msg: 'Adicione hosts e roteadores para auditar a segurança da rede planejada.',
+        devices: []
+      });
+      return issues;
+    }
+
+    // --- Hosts ---
+    hosts.forEach(h => {
+      const sec = ensureSecurity(h);
+
+      // Senhas seguras
+      const pwd = analyzePassword(sec.password);
+      if (!pwd.ok) {
+        issues.push({
+          level: 'err',
+          topic: 'Senhas seguras',
+          msg: `${h.label}: senha de acesso ${pwd.reason}. Defina uma senha forte (mín. 8 caracteres, letras e números).`,
+          devices: [h.id]
+        });
+      } else if (pwd.level === 'warn') {
+        issues.push({
+          level: 'warn',
+          topic: 'Senhas seguras',
+          msg: `${h.label}: ${pwd.reason}. Prefira 10+ caracteres com símbolo.`,
+          devices: [h.id]
+        });
+      }
+
+      // Atualização de dispositivos
+      if (!sec.updatesEnabled) {
+        issues.push({
+          level: 'err',
+          topic: 'Atualização de dispositivos',
+          msg: `${h.label}: atualizações automáticas desativadas. Equipamentos desatualizados ficam vulneráveis.`,
+          devices: [h.id]
+        });
+      }
+
+      // Firewall
+      if (!sec.firewallEnabled) {
+        issues.push({
+          level: 'err',
+          topic: 'Firewall',
+          msg: `${h.label}: firewall desativado. Ative o firewall local para filtrar tráfego indesejado.`,
+          devices: [h.id]
+        });
+      }
+
+      // Wi-Fi pública
+      if (sec.publicWifiAllowed) {
+        issues.push({
+          level: 'err',
+          topic: 'Wi-Fi públicas',
+          msg: `${h.label}: permite redes Wi-Fi públicas. Em redes abertas o tráfego pode ser interceptado — use VPN ou evite dados sensíveis.`,
+          devices: [h.id]
+        });
+      }
+
+      // Arquivo secreto sem firewall = rede falha no teste de invasão
+      const hasSecret = !!(sec.secretFileName && String(sec.secretFileName).trim()
+        && sec.secretFileContent && String(sec.secretFileContent).trim());
+      if (hasSecret && !sec.firewallEnabled) {
+        issues.push({
+          level: 'err',
+          topic: 'Firewall / arquivo secreto',
+          msg: `${h.label}: tem arquivo secreto "${sec.secretFileName}" mas o firewall está OFF — no teste de invasão o professor consegue o arquivo.`,
+          devices: [h.id]
+        });
+      }
+      if (sec.lastBreachStolen) {
+        issues.push({
+          level: 'err',
+          topic: 'Teste de invasão',
+          msg: `${h.label}: FALHOU no teste — arquivo "${sec.lastBreachStolen}" foi obtido. Ative o firewall e reteste.`,
+          devices: [h.id]
+        });
+      }
+    });
+
+    // --- Roteadores (Wi-Fi + admin + firewall) ---
+    routers.forEach(r => {
+      const sec = ensureSecurity(r);
+
+      // Senha de administração do equipamento
+      const adminPwd = analyzePassword(sec.adminPassword);
+      if (!adminPwd.ok) {
+        issues.push({
+          level: 'err',
+          topic: 'Proteção dos equipamentos',
+          msg: `${r.label}: senha de administração ${adminPwd.reason}. Proteja o acesso ao roteador.`,
+          devices: [r.id]
+        });
+      }
+
+      if (sec.remoteAdmin && !adminPwd.ok) {
+        issues.push({
+          level: 'err',
+          topic: 'Proteção dos equipamentos',
+          msg: `${r.label}: administração remota ligada com senha fraca/vazia — risco alto de invasão.`,
+          devices: [r.id]
+        });
+      } else if (sec.remoteAdmin) {
+        issues.push({
+          level: 'warn',
+          topic: 'Proteção dos equipamentos',
+          msg: `${r.label}: administração remota habilitada. Prefira desligar se não for necessária.`,
+          devices: [r.id]
+        });
+      }
+
+      if (!sec.updatesEnabled) {
+        issues.push({
+          level: 'err',
+          topic: 'Atualização de dispositivos',
+          msg: `${r.label}: firmware/atualizações desativadas. Mantenha o roteador atualizado.`,
+          devices: [r.id]
+        });
+      }
+
+      if (!sec.firewallEnabled) {
+        issues.push({
+          level: 'err',
+          topic: 'Firewall',
+          msg: `${r.label}: firewall do roteador desativado. Ative para proteger a LAN da Internet.`,
+          devices: [r.id]
+        });
+      }
+
+      // Wi-Fi
+      if (sec.wifiEnabled) {
+        const proto = (sec.wifiProtocol || 'open').toLowerCase();
+        if (proto === 'open') {
+          issues.push({
+            level: 'err',
+            topic: 'Proteção do Wi-Fi',
+            msg: `${r.label}: Wi-Fi aberto (sem senha). Qualquer um na área pode entrar na rede.`,
+            devices: [r.id]
+          });
+        } else if (proto === 'wep') {
+          issues.push({
+            level: 'err',
+            topic: 'WPA / WPA2 / WPA3',
+            msg: `${r.label}: Wi-Fi com WEP (inseguro e obsoleto). Use WPA2 ou WPA3.`,
+            devices: [r.id]
+          });
+        } else if (proto === 'wpa') {
+          issues.push({
+            level: 'warn',
+            topic: 'WPA / WPA2 / WPA3',
+            msg: `${r.label}: Wi-Fi com WPA legado. Prefira WPA2 ou WPA3.`,
+            devices: [r.id]
+          });
+        } else if (proto !== 'wpa2' && proto !== 'wpa3') {
+          issues.push({
+            level: 'err',
+            topic: 'WPA / WPA2 / WPA3',
+            msg: `${r.label}: protocolo Wi-Fi desconhecido (${proto}). Configure WPA2 ou WPA3.`,
+            devices: [r.id]
+          });
+        }
+
+        if (proto !== 'open') {
+          const wifiPwd = analyzePassword(sec.wifiPassword);
+          if (!wifiPwd.ok) {
+            issues.push({
+              level: 'err',
+              topic: 'Proteção do Wi-Fi',
+              msg: `${r.label}: senha do Wi-Fi ${wifiPwd.reason}.`,
+              devices: [r.id]
+            });
+          }
+        }
+
+        if (!sec.wifiSsid || !String(sec.wifiSsid).trim()) {
+          issues.push({
+            level: 'warn',
+            topic: 'Proteção do Wi-Fi',
+            msg: `${r.label}: SSID vazio. Defina um nome da rede (evite dados pessoais no SSID).`,
+            devices: [r.id]
+          });
+        }
+      } else if (hosts.length) {
+        // rede com hosts mas sem Wi-Fi no roteador — ok (só cabo); sem falha
+      }
+    });
+
+    // Se há hosts e nenhum roteador com firewall, reforça o tema
+    if (hosts.length && routers.length === 0) {
+      issues.push({
+        level: 'warn',
+        topic: 'Firewall',
+        msg: 'Não há roteador na topologia. Em redes reais o firewall de borda costuma ficar no roteador.',
+        devices: []
+      });
+    }
+
+    return issues;
+  }
+
+  function getSecurityVerdict(issues) {
+    const errs = (issues || []).filter(i => i.level === 'err');
+    const warns = (issues || []).filter(i => i.level === 'warn');
+    if (!errs.length && !warns.length) {
+      return { status: 'OK', label: 'OK', className: 'ok', errs: 0, warns: 0 };
+    }
+    if (errs.length) {
+      return { status: 'FALHA', label: errs.length + ' falha(s)', className: 'err', errs: errs.length, warns: warns.length };
+    }
+    return { status: 'AVISO', label: warns.length + ' aviso(s)', className: 'warn', errs: 0, warns: warns.length };
+  }
+
+  function renderSecurity(issues, { logIssues = false } = {}) {
+    state.lastSecurityIssues = issues;
+    state.lastSecurityAt = new Date().toISOString();
+    const list = document.getElementById('security-list');
+    const badge = document.getElementById('sec-badge');
+    if (!list || !badge) return;
+
+    const errs = issues.filter(i => i.level === 'err');
+    const warns = issues.filter(i => i.level === 'warn');
+    const verdict = getSecurityVerdict(issues);
+
+    document.querySelectorAll('.device').forEach(el => el.classList.remove('has-security-issue'));
+    const badDevs = new Set();
+    errs.forEach(i => (i.devices || []).forEach(id => badDevs.add(id)));
+    badDevs.forEach(id => document.getElementById(id)?.classList.add('has-security-issue'));
+
+    badge.textContent = verdict.label;
+    badge.className = 'val-badge ' + verdict.className;
+
+    const esc = (t) => String(t ?? '')
+      .replace(/&/g, '&amp;')
+      .replace(/</g, '&lt;')
+      .replace(/>/g, '&gt;')
+      .replace(/"/g, '&quot;');
+
+    let html = '';
+    if (state.currentLab) {
+      const lab = state.currentLab;
+      html += '<div class="sec-lab-banner"><strong>Lab: ' + esc(lab.titulo || lab.id || 'Atividade de segurança') + '</strong>';
+      html += lab.objetivo ? esc(lab.objetivo) : 'Corrija as falhas em vermelho e reaudite até o resultado OK.';
+      if (lab.sucesso) html += '<span class="sec-verdict-sub">Sucesso: ' + esc(lab.sucesso) + '</span>';
+      html += '</div>';
+    }
+
+    if (verdict.status === 'OK') {
+      html += '<div class="sec-verdict pass">✅ REDE SEGURA<span class="sec-verdict-sub">Checklist básico OK: senhas, Wi-Fi (WPA2/WPA3), firewall, atualizações, Wi-Fi pública e proteção dos equipamentos. Exporte o Relatório para entregar.</span></div>';
+      html += '<div class="sec-item ok"><span class="sec-topic">Auditoria</span>Nenhum item crítico. A rede planejada passou no teste de segurança básica.</div>';
+    } else if (verdict.status === 'FALHA') {
+      html += '<div class="sec-verdict fail">❌ REDE NÃO SEGURA — ' + errs.length + ' falha(s) em vermelho<span class="sec-verdict-sub">Clique no dispositivo destacado, corrija o bloco 🔒 Segurança, Salve e clique em Auditar de novo.</span></div>';
+      html += issues.map(i => {
+        const icon = i.level === 'err' ? '❌' : (i.level === 'warn' ? '⚠️' : '✅');
+        return '<div class="sec-item ' + i.level + '"><span class="sec-topic">' + esc(i.topic || 'Segurança') + '</span>' + icon + ' ' + esc(i.msg) + '</div>';
+      }).join('');
+    } else {
+      html += '<div class="sec-verdict warn">⚠️ SEM FALHAS CRÍTICAS — ' + warns.length + ' aviso(s)<span class="sec-verdict-sub">O professor pode aceitar avisos amarelos. Prefira corrigir (ex.: admin remota, WPA legado).</span></div>';
+      html += issues.map(i => {
+        const icon = i.level === 'err' ? '❌' : (i.level === 'warn' ? '⚠️' : '✅');
+        return '<div class="sec-item ' + i.level + '"><span class="sec-topic">' + esc(i.topic || 'Segurança') + '</span>' + icon + ' ' + esc(i.msg) + '</div>';
+      }).join('');
+    }
+
+    list.innerHTML = html;
+
+    if (logIssues) {
+      if (verdict.status === 'OK') {
+        log('Segurança: ✅ REDE SEGURA — checklist básico atendido. Pode exportar o Relatório.', 'ok');
+      } else if (verdict.status === 'FALHA') {
+        log('Segurança: ❌ REDE NÃO SEGURA — ' + errs.length + ' falha(s) em vermelho, ' + warns.length + ' aviso(s).', 'err');
+        issues.filter(i => i.level === 'err').forEach(i => {
+          log('❌ [' + (i.topic || 'Segurança') + '] ' + i.msg, 'err');
+        });
+      } else {
+        log('Segurança: ⚠️ ' + warns.length + ' aviso(s) (sem falha crítica).', 'warn');
+        issues.forEach(i => log('⚠️ [' + (i.topic || 'Segurança') + '] ' + i.msg, 'warn'));
+      }
+    }
+  }
+
+  function runSecurityAudit(logIssues = true) {
+    state.devices.forEach(d => {
+      if (d.type === 'host' || d.type === 'router') ensureSecurity(d);
+    });
+    const issues = validateSecurity();
+    renderSecurity(issues, { logIssues });
+    if (state.selectedId) {
+      const sel = getDevice(state.selectedId);
+      if (sel && (sel.type === 'host' || sel.type === 'router')) renderProperties();
+    }
+    return issues;
+  }
+
+  /** Relatório para o aluno entregar: topologia + resultado da auditoria. */
+  function exportSecurityReport() {
+    const issues = runSecurityAudit(false);
+    const verdict = getSecurityVerdict(issues);
+    const report = {
+      tipo: 'relatorio-seguranca',
+      geradoEm: new Date().toISOString(),
+      resultado: verdict.status,
+      falhas: verdict.errs,
+      avisos: verdict.warns,
+      lab: state.currentLab || null,
+      checklist: [
+        'Senhas seguras',
+        'Proteção do Wi-Fi',
+        'WPA / WPA2 / WPA3',
+        'Atualização de dispositivos',
+        'Firewall',
+        'Riscos de Wi-Fi públicas',
+        'Proteção básica dos equipamentos'
+      ],
+      issues: issues.map(i => ({
+        level: i.level,
+        topic: i.topic || 'Segurança',
+        msg: i.msg,
+        devices: i.devices || []
+      })),
+      topologia: serializeTopology()
+    };
+    const blob = new Blob([JSON.stringify(report, null, 2)], { type: 'application/json' });
+    const a = document.createElement('a');
+    a.href = URL.createObjectURL(blob);
+    const stamp = new Date().toISOString().slice(0, 10);
+    const tag = verdict.status === 'OK' ? 'OK' : 'FALHA';
+    a.download = 'relatorio-seguranca-' + tag + '-' + stamp + '.json';
+    a.click();
+    URL.revokeObjectURL(a.href);
+    if (verdict.status === 'OK') {
+      log('Relatório de segurança exportado (resultado OK). Entregue este arquivo ao professor.', 'ok');
+    } else {
+      log('Relatório exportado com resultado ' + verdict.status + ' (' + verdict.errs + ' falha(s)). Corrija e reexporte.', verdict.status === 'FALHA' ? 'err' : 'warn');
+    }
+  }
+
+  /**
+   * Teste de invasão didático (gancho para firewall).
+   * Aluno cria arquivo secreto no host; professor tenta "roubar".
+   * Firewall OFF → obtém o arquivo (rede falhou).
+   * Firewall ON  → bloqueia (rede resiste).
+   */
+  function openAttackModal() {
+    const hosts = state.devices.filter(d => d.type === 'host');
+    if (!hosts.length) {
+      alert('Adicione pelo menos um Host (PC) na topologia.');
+      return;
+    }
+    const sel = document.getElementById('attack-target');
+    const result = document.getElementById('attack-result');
+    if (result) {
+      result.className = 'attack-result';
+      result.textContent = '';
+    }
+    sel.innerHTML = hosts.map(h => {
+      const sec = ensureSecurity(h);
+      const hasFile = sec.secretFileName && String(sec.secretFileName).trim();
+      const fw = sec.firewallEnabled ? 'firewall ON' : 'firewall OFF';
+      const file = hasFile ? `arquivo: ${sec.secretFileName}` : 'sem arquivo secreto';
+      return `<option value="${h.id}">${h.label}${h.ip ? ' — ' + h.ip : ''} · ${file} · ${fw}</option>`;
+    }).join('');
+    // prefere host selecionado se for host
+    const current = state.selectedId ? getDevice(state.selectedId) : null;
+    if (current?.type === 'host') sel.value = current.id;
+    document.getElementById('modal-attack').classList.add('show');
+  }
+
+  function closeAttackModal() {
+    document.getElementById('modal-attack')?.classList.remove('show');
+  }
+
+  function runInvasionTest() {
+    const targetId = document.getElementById('attack-target')?.value;
+    const host = getDevice(targetId);
+    const resultEl = document.getElementById('attack-result');
+    if (!host || host.type !== 'host') {
+      alert('Selecione um host válido.');
+      return;
+    }
+
+    const sec = ensureSecurity(host);
+    const fileName = (sec.secretFileName || '').trim();
+    const fileContent = (sec.secretFileContent || '').trim();
+
+    document.querySelectorAll('.device').forEach(el => el.classList.remove('has-breach'));
+
+    // 1) Sem arquivo — aluno ainda não criou
+    if (!fileName || !fileContent) {
+      const msg = `${host.label}: não há arquivo secreto. O aluno deve criar o arquivo no painel do host (nome + conteúdo) e Salvar.`;
+      if (resultEl) {
+        resultEl.className = 'attack-result show fail';
+        resultEl.innerHTML = `⚠️ ${msg}`;
+      }
+      log(`🎯 Invasão: ${msg}`, 'warn');
+      return;
+    }
+
+    // 2) Firewall do host ligado → bloqueia (objetivo pedagógico)
+    if (sec.firewallEnabled) {
+      sec.lastBreachAt = null;
+      sec.lastBreachStolen = null;
+      host.security = sec;
+      markDirty();
+      const msg = `Firewall do ${host.label} bloqueou o acesso. Arquivo "${fileName}" NÃO foi obtido. Rede resiste ao teste.`;
+      if (resultEl) {
+        resultEl.className = 'attack-result show pass';
+        resultEl.innerHTML = `✅ ${msg}<br><span style="font-weight:500;opacity:0.9">Gancho de aula: o firewall filtra o tráfego indesejado e protege o arquivo no PC.</span>`;
+      }
+      log(`🎯 Invasão BLOQUEADA em ${host.label}: firewall ON — arquivo seguro.`, 'ok');
+      document.getElementById(host.id)?.classList.remove('has-breach', 'has-security-issue');
+      runSecurityAudit(false);
+      return;
+    }
+
+    // 3) Firewall OFF → "invasor" obtém o arquivo (rede falhou)
+    sec.lastBreachAt = new Date().toISOString();
+    sec.lastBreachStolen = fileName;
+    host.security = sec;
+    markDirty();
+    document.getElementById(host.id)?.classList.add('has-breach', 'has-security-issue');
+
+    const stolenPreview = fileContent.length > 120
+      ? fileContent.slice(0, 120) + '…'
+      : fileContent;
+
+    const msg = `FALHOU — arquivo obtido de ${host.label}: "${fileName}". Conteúdo: ${stolenPreview}`;
+    if (resultEl) {
+      resultEl.className = 'attack-result show fail';
+      resultEl.innerHTML = `❌ ${msg}<br><br>
+        <span style="font-weight:500">A rede da equipe falhou no teste de invasão.</span><br>
+        <span style="font-weight:500;opacity:0.95">Gancho de aula → ative o <strong>firewall do host</strong>, salve e rode o teste de novo. Depois falamos de firewall no roteador.</span>`;
+    }
+    log(`🎯 Invasão BEM-SUCEDIDA em ${host.label}: arquivo "${fileName}" obtido (firewall OFF).`, 'err');
+    log(`📄 Conteúdo roubado: ${stolenPreview}`, 'err');
+    runSecurityAudit(false);
+  }
+
   // ========== LOG / HISTÓRICO ==========
   function log(msg, type = '') {
     const time = new Date().toLocaleTimeString('pt-BR');
@@ -2984,7 +3720,7 @@
   }
 
   function serializeTopology() {
-    return {
+    const data = {
       version: 2,
       savedAt: new Date().toISOString(),
       nextId: state.nextId,
@@ -3026,7 +3762,8 @@
           ip: i.ip,
           mask: i.mask,
           linkId: i.linkId
-        })) : null
+        })) : null,
+        security: d.security ? { ...d.security } : null
       })),
       links: state.links.map(l => ({ id: l.id, from: l.from, to: l.to })),
       regions: (state.regions || []).map(r => ({
@@ -3038,6 +3775,8 @@
         color: r.color
       }))
     };
+    if (state.currentLab) data.lab = { ...state.currentLab };
+    return data;
   }
 
   function saveTopology(silent = false) {
@@ -3077,7 +3816,8 @@
         ipMode: d.ipMode || (d.type === 'host' ? 'static' : undefined),
         dhcpLease: d.dhcpLease || null,
         dhcp: null,
-        interfaces: d.interfaces ? d.interfaces.map(i => ({ ...i })) : null
+        interfaces: d.interfaces ? d.interfaces.map(i => ({ ...i })) : null,
+        security: d.security ? { ...defaultSecurity(d.type), ...d.security } : defaultSecurity(d.type)
       };
       if (d.type === 'dhcp') {
         base.mask = d.mask || d.dhcp?.mask || '255.255.255.0';
@@ -3090,6 +3830,7 @@
       if (d.type === 'host') {
         base.mask = d.mask || '255.255.255.0';
         base.ipMode = d.ipMode === 'dhcp' ? 'dhcp' : 'static';
+        base.security = { ...defaultSecurity('host'), ...(d.security || {}) };
       }
       if (d.type === 'isp') {
         base.interfaces = d.interfaces && d.interfaces.length
@@ -3103,6 +3844,9 @@
           { name: 'Gi0/2', ip: '', mask: '255.255.255.0', linkId: null },
           { name: 'Gi0/3', ip: '', mask: '255.255.255.0', linkId: null }
         ];
+      }
+      if (d.type === 'router') {
+        base.security = { ...defaultSecurity('router'), ...(d.security || {}) };
       }
       return base;
     });
@@ -3121,6 +3865,7 @@
     state.selectedId = null;
     state.selectedIds = [];
     state.selectedRegionId = null;
+    state.currentLab = data.lab && typeof data.lab === 'object' ? { ...data.lab } : null;
     setMode('select');
 
     state.devices.forEach(renderDevice);
@@ -3327,9 +4072,26 @@
     reader.onload = () => {
       try {
         const data = JSON.parse(reader.result);
-        applyTopology(data);
+        const topo = (data && data.tipo === 'relatorio-seguranca' && data.topologia)
+          ? data.topologia
+          : data;
+        if (data && data.tipo === 'relatorio-seguranca' && data.lab && !topo.lab) {
+          topo.lab = data.lab;
+        }
+        applyTopology(topo);
         saveTopology(true);
-        log('Topologia importada e salva com sucesso.', 'ok');
+        if (state.currentLab) {
+          log('Lab importado: ' + (state.currentLab.titulo || state.currentLab.id || 'segurança') + '. Rodando auditoria…', 'action');
+        } else {
+          log('Topologia importada e salva. Rodando auditoria de segurança…', 'ok');
+        }
+        const issues = runSecurityAudit(true);
+        const v = getSecurityVerdict(issues);
+        if (v.status === 'OK') {
+          log('Após importar: rede já está SEGURA no checklist. Exporte o Relatório se for entrega.', 'ok');
+        } else if (v.status === 'FALHA') {
+          log('Após importar: ' + v.errs + ' falha(s) de segurança em vermelho. Corrija nos dispositivos e reaudite.', 'err');
+        }
       } catch (e) {
         log('Falha ao importar: ' + e.message, 'err');
       }
@@ -3366,7 +4128,8 @@
       ipMode: type === 'host' ? 'static' : undefined,
       dhcpLease: type === 'host' ? null : undefined,
       dhcp: type === 'dhcp' ? defaultDhcpConfig() : null,
-      interfaces
+      interfaces,
+      security: defaultSecurity(type)
     };
     // rótulo ISP1, ISP2… (sem sufixo só se for o primeiro e label base "ISP")
     if (type === 'isp') {
@@ -4426,6 +5189,7 @@
         <p class="hint" style="margin-top:8px;">✂ <strong>Desfazer cabo:</strong> clique no cabo (fica vermelho) + Excluir · ou duplo clique · ou botão direito · ou ligue de novo os mesmos dois no modo Conectar.</p>
         <p class="hint" style="margin-top:8px;">📦 <strong>DHCP:</strong> + DHCP → configure pool → no host, modo DHCP → Obter IP. Use Validar e Simular Mensagem para testar.</p>
         <p class="hint" style="margin-top:8px;">☁️ <strong>ISP (lab manual):</strong> ligue cabos → configure IP/máscara em cada PE e na WAN do roteador (mesma sub-rede). Peering = ISP↔ISP. Auto /30 só se quiser (botões no ISP).</p>
+        <p class="hint" style="margin-top:8px;">🔒 <strong>Segurança:</strong> em Host/Roteador configure senhas, Wi-Fi (WPA2/WPA3), firewall e atualizações → clique em <strong>🔒 Segurança</strong>. Falhas em vermelho; OK = rede segura no checklist básico. Labs: pasta <code>labs-seguranca/</code>.</p>
         <p class="hint" style="margin-top:8px;">▢ <strong>Região:</strong> + Região → clique no quadro para criar o quadrado (Norte, Sul…). Só visual; arraste, redimensione ou exclua.</p>
         <p class="hint" style="margin-top:8px;">Zoom: scroll no quadro · Mover visão: arraste o fundo · Selecionar tudo: Ctrl+A</p>`;
       return;
@@ -4490,6 +5254,31 @@
       } else {
         html += `<p class="hint">O gateway deve ser o IP de uma interface do roteador na mesma subrede deste host. Não use endereço de rede (.0) nem broadcast (.255).</p>`;
       }
+
+      const hSec = ensureSecurity(dev);
+      const breachNote = hSec.lastBreachStolen
+        ? `<p class="hint" style="color:#b91c1c;font-weight:600;margin-top:6px">⚠ Último teste: arquivo "${escapeHtml(hSec.lastBreachStolen)}" foi obtido (falha). Ative o firewall e reteste.</p>`
+        : '';
+      html += `
+        <div class="security-box">
+          <h4>🔒 Segurança do host</h4>
+          <label>Senha de acesso do usuário</label>
+          <input type="text" id="prop-sec-password" value="${escapeHtml(hSec.password || '')}" placeholder="Mín. 8 caracteres, letras e números" autocomplete="off">
+          <label class="check-row"><input type="checkbox" id="prop-sec-updates" ${hSec.updatesEnabled ? 'checked' : ''}> Atualizações automáticas ativas</label>
+          <label class="check-row"><input type="checkbox" id="prop-sec-firewall" ${hSec.firewallEnabled ? 'checked' : ''}> Firewall do host ativo</label>
+          <label class="check-row"><input type="checkbox" id="prop-sec-public-wifi" ${hSec.publicWifiAllowed ? 'checked' : ''}> Permitir conexão em Wi-Fi públicas (risco)</label>
+          <div class="secret-file-box">
+            <strong>📄 Arquivo secreto (atividade de invasão)</strong>
+            <label>Nome do arquivo</label>
+            <input type="text" id="prop-sec-file-name" value="${escapeHtml(hSec.secretFileName || '')}" placeholder="Ex.: senha-do-cofre.txt">
+            <label>Conteúdo (o que o professor NÃO deve conseguir ler)</label>
+            <input type="text" id="prop-sec-file-content" value="${escapeHtml(hSec.secretFileContent || '')}" placeholder="Ex.: a senha do Wi-Fi é ...">
+            <p class="hint" style="margin-top:6px">Crie o arquivo e <strong>Salve</strong>. No teste de invasão, se o firewall estiver OFF o professor obtém o conteúdo = rede falhou. Firewall ON = bloqueia (gancho para a aula de firewall).</p>
+            ${breachNote}
+          </div>
+          <p class="hint" style="margin-top:8px">Use <strong>🔒 Segurança</strong> e <strong>🎯 Teste de invasão</strong> na barra.</p>
+        </div>`;
+
       html += `<div id="prop-errors" class="prop-error"></div>`;
     } else if (dev.type === 'dhcp') {
       const cfg = ensureDhcpConfig(dev);
@@ -4679,6 +5468,35 @@
           html += `</div>`;
         }
       }
+
+      if (dev.type === 'router') {
+        const rSec = ensureSecurity(dev);
+        const proto = (rSec.wifiProtocol || 'open').toLowerCase();
+        html += `
+          <div class="security-box">
+            <h4>🔒 Segurança do roteador / Wi-Fi</h4>
+            <label>Senha de administração</label>
+            <input type="text" id="prop-sec-admin-password" value="${escapeHtml(rSec.adminPassword || '')}" placeholder="Senha forte do painel admin" autocomplete="off">
+            <label class="check-row"><input type="checkbox" id="prop-sec-r-updates" ${rSec.updatesEnabled ? 'checked' : ''}> Firmware/atualizações ativas</label>
+            <label class="check-row"><input type="checkbox" id="prop-sec-r-firewall" ${rSec.firewallEnabled ? 'checked' : ''}> Firewall do roteador ativo</label>
+            <label class="check-row"><input type="checkbox" id="prop-sec-remote-admin" ${rSec.remoteAdmin ? 'checked' : ''}> Administração remota (risco se senha fraca)</label>
+            <label class="check-row"><input type="checkbox" id="prop-sec-wifi-enabled" ${rSec.wifiEnabled ? 'checked' : ''}> Wi-Fi (AP) habilitado</label>
+            <label>SSID (nome da rede)</label>
+            <input type="text" id="prop-sec-wifi-ssid" value="${escapeHtml(rSec.wifiSsid || '')}" placeholder="Ex.: RedeEscola">
+            <label>Protocolo Wi-Fi</label>
+            <select id="prop-sec-wifi-protocol">
+              <option value="open" ${proto === 'open' ? 'selected' : ''}>Aberto (sem senha) — inseguro</option>
+              <option value="wep" ${proto === 'wep' ? 'selected' : ''}>WEP — obsoleto/inseguro</option>
+              <option value="wpa" ${proto === 'wpa' ? 'selected' : ''}>WPA — legado</option>
+              <option value="wpa2" ${proto === 'wpa2' ? 'selected' : ''}>WPA2 — recomendado</option>
+              <option value="wpa3" ${proto === 'wpa3' ? 'selected' : ''}>WPA3 — recomendado</option>
+            </select>
+            <label>Senha do Wi-Fi</label>
+            <input type="text" id="prop-sec-wifi-password" value="${escapeHtml(rSec.wifiPassword || '')}" placeholder="Senha WPA2/WPA3" autocomplete="off">
+            <p class="hint" style="margin-top:8px">Checklist: senha forte, WPA2/WPA3, firewall e atualizações. Audite com <strong>🔒 Segurança</strong>.</p>
+          </div>`;
+      }
+
       html += `<div id="prop-errors" class="prop-error"></div>`;
     } else {
       html += `<p style="color:#94a3b8;font-size:0.85rem;margin-top:10px;">Switches operam na camada 2 e não precisam de endereço IP. Conectam dispositivos e aprendem MAC — não fazem roteamento.</p>`;
@@ -4887,7 +5705,24 @@
         dev.gateway = gw;
         dev.dns = dns;
         dev.dhcpLease = null;
-      }    } else if (dev.type === 'dhcp') {
+      }
+
+      // Segurança do host (sempre salva, mesmo em modo DHCP)
+      const hSec = ensureSecurity(dev);
+      hSec.password = document.getElementById('prop-sec-password')?.value ?? hSec.password;
+      hSec.updatesEnabled = !!document.getElementById('prop-sec-updates')?.checked;
+      const fwBefore = !!hSec.firewallEnabled;
+      hSec.firewallEnabled = !!document.getElementById('prop-sec-firewall')?.checked;
+      hSec.publicWifiAllowed = !!document.getElementById('prop-sec-public-wifi')?.checked;
+      hSec.secretFileName = document.getElementById('prop-sec-file-name')?.value?.trim() ?? hSec.secretFileName;
+      hSec.secretFileContent = document.getElementById('prop-sec-file-content')?.value ?? hSec.secretFileContent;
+      // Se ligou o firewall, limpa o "carimbo" de invasão anterior
+      if (hSec.firewallEnabled && !fwBefore) {
+        hSec.lastBreachAt = null;
+        hSec.lastBreachStolen = null;
+      }
+      dev.security = hSec;
+    } else if (dev.type === 'dhcp') {
       const ip = document.getElementById('prop-ip').value.trim();
       const mask = document.getElementById('prop-mask').value.trim() || '255.255.255.0';
       const enabled = !!document.getElementById('prop-dhcp-enabled')?.checked;
@@ -5029,13 +5864,30 @@
       });
 
       // Cabo estava em Gi0/0 e IP /30 em Gi0/1? Move o cabo para a interface certa.
-      rebindP2PLinks();    }
+      rebindP2PLinks();
+
+      if (dev.type === 'router') {
+        const rSec = ensureSecurity(dev);
+        rSec.adminPassword = document.getElementById('prop-sec-admin-password')?.value ?? rSec.adminPassword;
+        rSec.updatesEnabled = !!document.getElementById('prop-sec-r-updates')?.checked;
+        rSec.firewallEnabled = !!document.getElementById('prop-sec-r-firewall')?.checked;
+        rSec.remoteAdmin = !!document.getElementById('prop-sec-remote-admin')?.checked;
+        rSec.wifiEnabled = !!document.getElementById('prop-sec-wifi-enabled')?.checked;
+        rSec.wifiSsid = document.getElementById('prop-sec-wifi-ssid')?.value?.trim() ?? rSec.wifiSsid;
+        rSec.wifiProtocol = document.getElementById('prop-sec-wifi-protocol')?.value || rSec.wifiProtocol;
+        rSec.wifiPassword = document.getElementById('prop-sec-wifi-password')?.value ?? rSec.wifiPassword;
+        dev.security = rSec;
+      }
+    }
 
     updateDeviceIpLabel(dev);
     log(`Configuração de ${dev.label} salva.`, 'ok');
     markDirty();
     renderProperties();
-    if (state.mode === 'connect') updateConnectUI();  }
+    if (state.mode === 'connect') updateConnectUI();
+    // reaudita se o painel de segurança já foi usado
+    if (state.lastSecurityIssues) runSecurityAudit(false);
+  }
 
   // ========== MODO CONECTAR ==========
   function handleConnectClick(dev) {
@@ -5770,38 +6622,75 @@
     const props = document.getElementById('properties');
     const logSec = document.getElementById('log-section');
     const valSec = document.getElementById('validation-section');
+    const secSec = document.getElementById('security-section');
     if (!sidebar || !props || !logSec || !valSec) return;
+
+    // 2 ou 3 splitters (validações + segurança compartilham a fatia "val")
+    const splitterCount = document.querySelectorAll('.sidebar-splitter').length || 2;
     const totalH = sidebar.clientHeight;
-    const usable = Math.max(0, totalH - SPLITTER_H * 2);
+    const usable = Math.max(0, totalH - SPLITTER_H * splitterCount);
     if (usable < MIN_PANEL * 3) return;
+
     let hProps = Math.round(usable * splits.props);
     let hLog = Math.round(usable * splits.log);
-    let hVal = usable - hProps - hLog;
+    let hValBlock = usable - hProps - hLog;
+
+    // respeita mínimos redistribuindo o excesso
     if (hProps < MIN_PANEL) {
-      const need = MIN_PANEL - hProps; hProps = MIN_PANEL;
+      const need = MIN_PANEL - hProps;
+      hProps = MIN_PANEL;
       if (hLog - need >= MIN_PANEL) hLog -= need;
-      else { hVal = Math.max(MIN_PANEL, hVal - need); hLog = usable - hProps - hVal; }
+      else { hValBlock = Math.max(MIN_PANEL, hValBlock - need); hLog = usable - hProps - hValBlock; }
     }
     if (hLog < MIN_PANEL) {
-      const need = MIN_PANEL - hLog; hLog = MIN_PANEL;
+      const need = MIN_PANEL - hLog;
+      hLog = MIN_PANEL;
       if (hProps - need >= MIN_PANEL) hProps -= need;
-      else { hVal = Math.max(MIN_PANEL, hVal - need); hProps = usable - hLog - hVal; }
+      else { hValBlock = Math.max(MIN_PANEL, hValBlock - need); hProps = usable - hLog - hValBlock; }
     }
-    if (hVal < MIN_PANEL) {
-      const need = MIN_PANEL - hVal; hVal = MIN_PANEL;
+    if (hValBlock < MIN_PANEL) {
+      const need = MIN_PANEL - hValBlock;
+      hValBlock = MIN_PANEL;
       if (hLog - need >= MIN_PANEL) hLog -= need;
-      else { hProps = Math.max(MIN_PANEL, hProps - need); hLog = usable - hProps - hVal; }
+      else { hProps = Math.max(MIN_PANEL, hProps - need); hLog = usable - hProps - hValBlock; }
     }
-    const sum = hProps + hLog + hVal;
+
+    // corrige soma final
+    const sum = hProps + hLog + hValBlock;
     if (sum !== usable) hProps += usable - sum;
-    props.style.flex = `0 0 ${hProps}px`; props.style.height = hProps + 'px'; props.style.minHeight = MIN_PANEL + 'px';
-    logSec.style.flex = `0 0 ${hLog}px`; logSec.style.height = hLog + 'px'; logSec.style.minHeight = MIN_PANEL + 'px';
-    valSec.style.flex = `0 0 ${hVal}px`; valSec.style.height = hVal + 'px'; valSec.style.minHeight = MIN_PANEL + 'px';
-    const total = hProps + hLog + hVal;
-    if (total > 0) { splits.props = hProps / total; splits.log = hLog / total; splits.val = hVal / total; }
+
+    // divide o bloco inferior entre validações e segurança
+    let hVal = secSec ? Math.max(MIN_PANEL, Math.round(hValBlock * 0.45)) : hValBlock;
+    let hSec = secSec ? (hValBlock - hVal) : 0;
+    if (secSec && hSec < MIN_PANEL) {
+      hSec = MIN_PANEL;
+      hVal = Math.max(MIN_PANEL, hValBlock - hSec);
+    }
+
+    props.style.flex = `0 0 ${hProps}px`;
+    props.style.height = hProps + 'px';
+    props.style.minHeight = MIN_PANEL + 'px';
+    logSec.style.flex = `0 0 ${hLog}px`;
+    logSec.style.height = hLog + 'px';
+    logSec.style.minHeight = MIN_PANEL + 'px';
+    valSec.style.flex = `0 0 ${hVal}px`;
+    valSec.style.height = hVal + 'px';
+    valSec.style.minHeight = MIN_PANEL + 'px';
+    if (secSec) {
+      secSec.style.flex = `0 0 ${hSec}px`;
+      secSec.style.height = hSec + 'px';
+      secSec.style.minHeight = MIN_PANEL + 'px';
+    }
+
+    const total = hProps + hLog + hValBlock;
+    if (total > 0) {
+      splits.props = hProps / total;
+      splits.log = hLog / total;
+      splits.val = hValBlock / total;
+    }
   }
 
-  function initSidebarResize  function initSidebarResize() {
+  function initSidebarResize() {
     const sidebar = document.getElementById('sidebar');
     const split1 = document.getElementById('split-props-log');
     const split2 = document.getElementById('split-log-val');
@@ -5921,9 +6810,21 @@
     state.links = [];
     state.regions = [];
     state.selectedRegionId = null;
+    state.currentLab = null;
+    state.lastSecurityIssues = null;
+    state.lastSecurityAt = null;
     clearCanvasDevices();
     updateLinks();
     selectDevice(null);
+    const secList = document.getElementById('security-list');
+    const secBadge = document.getElementById('sec-badge');
+    if (secList) {
+      secList.innerHTML = '<div class="val-item ok">Topologia limpa. Monte a rede ou importe o JSON do professor e clique em <strong>Auditar</strong>.</div>';
+    }
+    if (secBadge) {
+      secBadge.textContent = '—';
+      secBadge.className = 'val-badge ok';
+    }
     log('Topologia limpa.', 'action');
     markDirty();
     saveTopology(true);
@@ -5941,7 +6842,13 @@
 
   document.getElementById('btn-validate').onclick = () => runValidation(true);
   document.getElementById('btn-validate-side').onclick = () => runValidation(true);
-          
+  document.getElementById('btn-security').onclick = () => runSecurityAudit(true);
+  document.getElementById('btn-security-side').onclick = () => runSecurityAudit(true);
+  document.getElementById('btn-export-security').onclick = () => exportSecurityReport();
+  document.getElementById('btn-attack').onclick = () => openAttackModal();
+  document.getElementById('btn-cancel-attack').onclick = () => closeAttackModal();
+  document.getElementById('btn-run-attack').onclick = () => runInvasionTest();
+
   document.getElementById('btn-clear-log').onclick = () => {
     state.history = [];
     renderLog();
