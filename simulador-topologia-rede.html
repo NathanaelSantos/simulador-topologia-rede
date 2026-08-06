@@ -1233,12 +1233,11 @@
         </div>
         <div id="security-list">
           <div class="val-item ok">
-            <strong>Fluxo da atividade:</strong>
-            1) Importe o JSON do professor (⬆ Importar) ou monte a rede ·
-            2) Configure 🔒 Segurança em cada Host e Roteador ·
-            3) Clique em <strong>Auditar</strong> ·
-            4) Se OK → rede segura · se falhar → itens em <strong style="color:#b91c1c">vermelho</strong> ·
-            5) Exporte o <strong>Relatório</strong> para entregar.
+            <strong>Qualquer rede que vocês criarem:</strong>
+            1) Monte a topologia (hosts, switches, roteadores, ISP…) ·
+            2) No host: arquivo secreto + firewall OFF → 🎯 invasão deve obter o arquivo ·
+            3) Ligue o firewall do host → reteste (deve bloquear) ·
+            4) <strong>Auditar</strong> o checklist e exporte o <strong>Relatório</strong> se for entrega.
           </div>
         </div>
       </div>
@@ -1267,22 +1266,23 @@
     <div class="modal">
       <h2>🎯 Teste de invasão (didático)</h2>
       <p class="hint" style="margin-top:0;margin-bottom:12px">
-        A turma planeja a rede (ex.: <strong>2 sites + ISP</strong>) com arquivo secreto nos PCs.
-        <strong>1º teste:</strong> sem firewall → invasão obtém o arquivo (rede falhou).
-        <strong>2º teste:</strong> com firewall no host → ataque bloqueado (rede resiste).
+        Funciona em <strong>qualquer rede</strong> que a turma montar (1 LAN, 2 sites + ISP, etc.).
+        Em cada PC: arquivo secreto + firewall. <strong>1º teste</strong> (firewall OFF) → invasão obtém o arquivo.
+        <strong>2º teste</strong> (firewall ON) → bloqueado.
       </p>
-      <label>Host-alvo (PC com o arquivo)</label>
+      <label>Host-alvo (qualquer Host da topologia)</label>
       <select id="attack-target"></select>
-      <div class="modal-actions">
+      <p class="hint" id="attack-host-hint" style="margin-top:6px"></p>
+      <div class="modal-actions" style="flex-wrap:wrap">
         <button class="secondary" id="btn-cancel-attack" type="button">Cancelar</button>
+        <button class="secondary" id="btn-prepare-secret" type="button" title="Cria um arquivo secreto de exemplo e deixa o firewall OFF neste host">📄 Preparar arquivo secreto</button>
         <button class="danger" id="btn-run-attack" type="button">Tentar obter o arquivo</button>
       </div>
       <div id="attack-result" class="attack-result" role="status"></div>
       <p class="hint">
-        Regra: <strong>firewall do host OFF</strong> → vermelho (falha).
-        <strong>Firewall ON</strong> → verde (proteção).
-        Depois do bloqueio, use <strong>🔒 Segurança</strong> no painel direito para fechar o checklist.
-        Não é ataque real — simulação de aula.
+        Regra universal: <strong>firewall do host OFF</strong> → vermelho (rede falhou).
+        <strong>Firewall ON</strong> → verde (rede resiste).
+        Lab pronto opcional: <code>labs-seguranca/04-duas-redes-invasao.json</code> — mas o mesmo fluxo vale para a rede que <em>você</em> criar.
       </p>
     </div>
   </div>
@@ -3517,34 +3517,110 @@
   }
 
   /**
-   * Teste de invasão didático (gancho para firewall).
-   * Aluno cria arquivo secreto no host; professor tenta "roubar".
+   * Teste de invasão didático — vale para QUALQUER topologia (não só labs).
+   * Em cada Host: arquivo secreto + firewall OFF/ON.
    * Firewall OFF → obtém o arquivo (rede falhou).
    * Firewall ON  → bloqueia (rede resiste).
    */
+  function refreshAttackTargetList(preferredId) {
+    const hosts = state.devices.filter(d => d.type === 'host');
+    const sel = document.getElementById('attack-target');
+    if (!sel) return hosts;
+    if (!hosts.length) {
+      sel.innerHTML = '';
+      return hosts;
+    }
+    sel.innerHTML = hosts.map(h => {
+      const sec = ensureSecurity(h);
+      const hasFile = !!(sec.secretFileName && String(sec.secretFileName).trim()
+        && sec.secretFileContent && String(sec.secretFileContent).trim());
+      const fw = sec.firewallEnabled ? 'firewall ON' : 'firewall OFF';
+      const file = hasFile ? `arquivo: ${sec.secretFileName}` : 'sem arquivo secreto';
+      return `<option value="${h.id}">${escapeHtml(h.label)}${h.ip ? ' — ' + escapeHtml(h.ip) : ''} · ${file} · ${fw}</option>`;
+    }).join('');
+    const prefer = preferredId && hosts.some(h => h.id === preferredId)
+      ? preferredId
+      : (state.selectedId && getDevice(state.selectedId)?.type === 'host'
+        ? state.selectedId
+        : hosts[0].id);
+    sel.value = prefer;
+    updateAttackHostHint();
+    return hosts;
+  }
+
+  function updateAttackHostHint() {
+    const hint = document.getElementById('attack-host-hint');
+    const host = getDevice(document.getElementById('attack-target')?.value);
+    if (!hint) return;
+    if (!host) {
+      hint.textContent = 'Adicione Hosts na topologia para testar.';
+      return;
+    }
+    const sec = ensureSecurity(host);
+    const hasFile = !!(sec.secretFileName && String(sec.secretFileName).trim()
+      && sec.secretFileContent && String(sec.secretFileContent).trim());
+    const parts = [
+      `Alvo: ${host.label}`,
+      host.ip ? `IP ${host.ip}` : 'sem IP (não impede o teste de invasão)',
+      hasFile ? `arquivo "${sec.secretFileName}"` : 'ainda sem arquivo secreto',
+      sec.firewallEnabled ? 'firewall ON (deve bloquear)' : 'firewall OFF (invasão deve obter o arquivo)'
+    ];
+    hint.innerHTML = parts.map(p => escapeHtml(p)).join(' · ');
+  }
+
+  /** Prepara qualquer host da rede do aluno para o lab de invasão. */
+  function prepareSecretOnSelectedHost() {
+    const host = getDevice(document.getElementById('attack-target')?.value);
+    const resultEl = document.getElementById('attack-result');
+    if (!host || host.type !== 'host') {
+      alert('Selecione um host na lista.');
+      return;
+    }
+    const sec = ensureSecurity(host);
+    const n = state.devices.filter(d => d.type === 'host').indexOf(host) + 1;
+    sec.secretFileName = sec.secretFileName?.trim() || `segredo-${host.label.replace(/\s+/g, '-')}.txt`;
+    sec.secretFileContent = sec.secretFileContent?.trim()
+      || `Documento confidencial de ${host.label} (rede da turma) — código LAB-${n}-${Date.now().toString(36).toUpperCase()}`;
+    // para o 1º teste didático, garante firewall OFF
+    sec.firewallEnabled = false;
+    sec.lastBreachAt = null;
+    sec.lastBreachStolen = null;
+    host.security = sec;
+    markDirty();
+    saveTopology(true);
+    refreshAttackTargetList(host.id);
+    if (state.selectedId === host.id) renderProperties();
+    const msg = `${host.label}: arquivo secreto pronto e firewall OFF. Rode "Tentar obter o arquivo" (deve falhar a rede). Depois ligue o firewall e reteste.`;
+    if (resultEl) {
+      resultEl.className = 'attack-result show';
+      resultEl.style.display = 'block';
+      resultEl.innerHTML = `📄 ${escapeHtml(msg)}`;
+      resultEl.classList.remove('fail', 'pass');
+    }
+    log(`📄 Host ${host.label} preparado para invasão: "${sec.secretFileName}" · firewall OFF.`, 'action');
+    runSecurityAudit(false);
+  }
+
   function openAttackModal() {
     const hosts = state.devices.filter(d => d.type === 'host');
     if (!hosts.length) {
-      alert('Adicione pelo menos um Host (PC) na topologia.');
+      alert('Monte a rede e adicione pelo menos um Host (PC). O teste funciona em qualquer topologia.');
       return;
     }
-    const sel = document.getElementById('attack-target');
     const result = document.getElementById('attack-result');
     if (result) {
       result.className = 'attack-result';
       result.textContent = '';
+      result.style.display = '';
     }
-    sel.innerHTML = hosts.map(h => {
-      const sec = ensureSecurity(h);
-      const hasFile = sec.secretFileName && String(sec.secretFileName).trim();
-      const fw = sec.firewallEnabled ? 'firewall ON' : 'firewall OFF';
-      const file = hasFile ? `arquivo: ${sec.secretFileName}` : 'sem arquivo secreto';
-      return `<option value="${h.id}">${h.label}${h.ip ? ' — ' + h.ip : ''} · ${file} · ${fw}</option>`;
-    }).join('');
-    // prefere host selecionado se for host
-    const current = state.selectedId ? getDevice(state.selectedId) : null;
-    if (current?.type === 'host') sel.value = current.id;
+    refreshAttackTargetList();
+    const sel = document.getElementById('attack-target');
+    if (sel && !sel._invasionChangeBound) {
+      sel.addEventListener('change', updateAttackHostHint);
+      sel._invasionChangeBound = true;
+    }
     document.getElementById('modal-attack').classList.add('show');
+    log('🎯 Teste de invasão: escolha qualquer host da sua rede. Vale para topologias criadas do zero ou labs importados.', 'info');
   }
 
   function closeAttackModal() {
@@ -3556,7 +3632,7 @@
     const host = getDevice(targetId);
     const resultEl = document.getElementById('attack-result');
     if (!host || host.type !== 'host') {
-      alert('Selecione um host válido.');
+      alert('Selecione um host válido da topologia.');
       return;
     }
 
@@ -3566,36 +3642,37 @@
 
     document.querySelectorAll('.device').forEach(el => el.classList.remove('has-breach'));
 
-    // 1) Sem arquivo — aluno ainda não criou
+    // 1) Sem arquivo — em qualquer rede o aluno precisa criar (ou usar "Preparar arquivo secreto")
     if (!fileName || !fileContent) {
-      const msg = `${host.label}: não há arquivo secreto. O aluno deve criar o arquivo no painel do host (nome + conteúdo) e Salvar.`;
+      const msg = `${host.label}: não há arquivo secreto. No painel do host preencha nome + conteúdo e Salve — ou use o botão "Preparar arquivo secreto" neste diálogo.`;
       if (resultEl) {
         resultEl.className = 'attack-result show fail';
-        resultEl.innerHTML = `⚠️ ${msg}`;
+        resultEl.innerHTML = `⚠️ ${escapeHtml(msg)}`;
       }
       log(`🎯 Invasão: ${msg}`, 'warn');
       return;
     }
 
-    // 2) Firewall do host ligado → bloqueia (objetivo pedagógico)
+    // 2) Firewall do host ligado → bloqueia (qualquer topologia)
     if (sec.firewallEnabled) {
       sec.lastBreachAt = null;
       sec.lastBreachStolen = null;
       host.security = sec;
       markDirty();
-      const msg = `Firewall do ${host.label} bloqueou o acesso. Arquivo "${fileName}" NÃO foi obtido. Rede resiste ao teste.`;
+      const msg = `Firewall do ${host.label} bloqueou o acesso. Arquivo "${fileName}" NÃO foi obtido. A rede que vocês planejaram resiste ao teste.`;
       if (resultEl) {
         resultEl.className = 'attack-result show pass';
-        resultEl.innerHTML = `✅ ${msg}<br><span style="font-weight:500;opacity:0.9">Compare com o 1º teste (sem firewall): agora a rede planejada está protegida. Próximo passo: 🔒 Segurança no painel direito.</span>`;
+        resultEl.innerHTML = `✅ ${escapeHtml(msg)}<br><span style="font-weight:500;opacity:0.9">Compare com o 1º teste (sem firewall). Vale para qualquer rede montada no simulador.</span>`;
       }
-      log(`🎯 Invasão BLOQUEADA em ${host.label}: firewall ON — arquivo seguro. Reteste após proteger a rede: sucesso da defesa.`, 'ok');
+      log(`🎯 Invasão BLOQUEADA em ${host.label}: firewall ON — arquivo seguro.`, 'ok');
       document.getElementById(host.id)?.classList.remove('has-breach', 'has-security-issue');
       runSecurityAudit(false);
       saveTopology(true);
+      refreshAttackTargetList(host.id);
       return;
     }
 
-    // 3) Firewall OFF → "invasor" obtém o arquivo (rede falhou)
+    // 3) Firewall OFF → "invasor" obtém o arquivo (rede falhou) — qualquer host
     sec.lastBreachAt = new Date().toISOString();
     sec.lastBreachStolen = fileName;
     host.security = sec;
@@ -3609,14 +3686,15 @@
     const msg = `FALHOU — arquivo obtido de ${host.label}: "${fileName}". Conteúdo: ${stolenPreview}`;
     if (resultEl) {
       resultEl.className = 'attack-result show fail';
-      resultEl.innerHTML = `❌ ${msg}<br><br>
-        <span style="font-weight:500">A rede planejada falhou no teste de invasão (sem firewall).</span><br>
-        <span style="font-weight:500;opacity:0.95"><strong>Próximo passo:</strong> selecione o host → ☑ Firewall do host ativo → <strong>Salvar</strong> → rode o teste de novo. Deve bloquear.</span>`;
+      resultEl.innerHTML = `❌ ${escapeHtml(msg)}<br><br>
+        <span style="font-weight:500">A rede que vocês criaram falhou no teste (sem firewall no host).</span><br>
+        <span style="font-weight:500;opacity:0.95"><strong>Próximo passo (qualquer topologia):</strong> selecione ${escapeHtml(host.label)} → ☑ Firewall do host ativo → <strong>Salvar</strong> → teste de novo.</span>`;
     }
-    log(`🎯 Invasão BEM-SUCEDIDA em ${host.label}: arquivo "${fileName}" obtido (firewall OFF). Rede desprotegida.`, 'err');
+    log(`🎯 Invasão BEM-SUCEDIDA em ${host.label}: arquivo "${fileName}" obtido (firewall OFF).`, 'err');
     log(`📄 Conteúdo roubado: ${stolenPreview}`, 'err');
     runSecurityAudit(false);
     saveTopology(true);
+    refreshAttackTargetList(host.id);
   }
 
   // ========== LOG / HISTÓRICO ==========
@@ -5353,15 +5431,20 @@
           <label class="check-row"><input type="checkbox" id="prop-sec-firewall" ${hSec.firewallEnabled ? 'checked' : ''}> Firewall do host ativo</label>
           <label class="check-row"><input type="checkbox" id="prop-sec-public-wifi" ${hSec.publicWifiAllowed ? 'checked' : ''}> Permitir conexão em Wi-Fi públicas (risco)</label>
           <div class="secret-file-box">
-            <strong>📄 Arquivo secreto (atividade de invasão)</strong>
+            <strong>📄 Arquivo secreto (invasão — qualquer rede)</strong>
             <label>Nome do arquivo</label>
-            <input type="text" id="prop-sec-file-name" value="${escapeHtml(hSec.secretFileName || '')}" placeholder="Ex.: senha-do-cofre.txt">
+            <input type="text" id="prop-sec-file-name" value="${escapeHtml(hSec.secretFileName || '')}" placeholder="Ex.: folha-pagamento.txt">
             <label>Conteúdo (o que o professor NÃO deve conseguir ler)</label>
-            <input type="text" id="prop-sec-file-content" value="${escapeHtml(hSec.secretFileContent || '')}" placeholder="Ex.: a senha do Wi-Fi é ...">
-            <p class="hint" style="margin-top:6px">Crie o arquivo e <strong>Salve</strong>. No teste de invasão, se o firewall estiver OFF o professor obtém o conteúdo = rede falhou. Firewall ON = bloqueia (gancho para a aula de firewall).</p>
+            <input type="text" id="prop-sec-file-content" value="${escapeHtml(hSec.secretFileContent || '')}" placeholder="Ex.: dados confidenciais da equipe">
+            <p class="hint" style="margin-top:6px">
+              Vale para a topologia que <strong>vocês criarem</strong> (1 rede, 2 sites + ISP, etc.).
+              1) Crie o arquivo e deixe o firewall <strong>desmarcado</strong> → <strong>Salvar</strong> ·
+              2) <strong>🎯 Teste de invasão</strong> deve obter o arquivo (vermelho) ·
+              3) Marque o firewall → Salvar → reteste (verde).
+            </p>
             ${breachNote}
           </div>
-          <p class="hint" style="margin-top:8px">Use <strong>🔒 Segurança</strong> e <strong>🎯 Teste de invasão</strong> na barra.</p>
+          <p class="hint" style="margin-top:8px">Barra: <strong>🎯 Teste de invasão</strong> · painel direito: <strong>🔒 Segurança</strong>.</p>
         </div>`;
 
       html += `<div id="prop-errors" class="prop-error"></div>`;
@@ -7000,6 +7083,7 @@
   document.getElementById('btn-attack').onclick = () => openAttackModal();
   document.getElementById('btn-cancel-attack').onclick = () => closeAttackModal();
   document.getElementById('btn-run-attack').onclick = () => runInvasionTest();
+  document.getElementById('btn-prepare-secret').onclick = () => prepareSecretOnSelectedHost();
 
   document.getElementById('btn-clear-log').onclick = () => {
     state.history = [];

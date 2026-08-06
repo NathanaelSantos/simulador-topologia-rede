@@ -11,16 +11,16 @@ Cada lab planta **falhas de segurança** (senhas, Wi-Fi, firewall, atualizaçõe
 4. Corrija as falhas em **vermelho** nos dispositivos (painel de propriedades → bloco 🔒 Segurança).
 5. Clique de novo em **🔒 Segurança** até o badge ficar **OK**.
 
-### Sequência de aula: duas redes + invasão + firewall
+### Sequência de aula: rede da turma + invasão + firewall
 
-Ideia: a turma monta (ou importa) **duas redes completas** ligadas pelo **ISP**. Os PCs têm arquivo secreto e começam **sem firewall**.
+O teste **não depende de um lab fixo**: vale para **qualquer topologia** criada no simulador (1 LAN, 2 sites + ISP, etc.).
 
-1. **Montar a rede** — Site A e Site B com host, switch, roteador, IPs e cabos (ou importe `04-duas-redes-invasao.json`).
-2. **Arquivo secreto** — no host, nome + conteúdo (no lab 04 já vem pronto) e **Salvar**.
-3. **1º teste de invasão** (professor) — **🎯 Teste de invasão** → host alvo → **sucesso do ataque** (vermelho) porque o firewall está OFF.
-4. **Proteger** — aluno marca **Firewall do host ativo**, salva (opcional: firewall do roteador também).
-5. **2º teste de invasão** — mesmo host → **ataque bloqueado** (verde). Rede resiste.
-6. **Discutir** — o que o firewall faz; diferença host vs roteador; demais itens de 🔒 Segurança.
+1. **Montar a rede** — alunos criam do zero **ou** importam um JSON (ex.: `04-duas-redes-invasao.json`).
+2. **Arquivo secreto** — em cada Host: nome + conteúdo (ou no diálogo de invasão: **📄 Preparar arquivo secreto**) e **Salvar**. Firewall começa **OFF**.
+3. **1º teste** — **🎯 Teste de invasão** → host alvo → **sucesso do ataque** (vermelho).
+4. **Proteger** — ☑ **Firewall do host ativo** → Salvar.
+5. **2º teste** — mesmo host → **bloqueado** (verde).
+6. **Auditar** — 🔒 Segurança / relatório (senhas, Wi-Fi, updates…).
 
 > Entregue só os JSON + este README. O gabarito fica com o professor (`gabarito/`).
 
