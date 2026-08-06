@@ -6,7 +6,7 @@
   <meta http-equiv="Pragma" content="no-cache">
   <meta http-equiv="Expires" content="0">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <meta name="app-version" content="2026-08-06-painel">
+  <meta name="app-version" content="2026-08-06-monitor-dir">
   <title>Simulador de Topologia de Rede - UC1</title>
   <style>
     * { box-sizing: border-box; margin: 0; padding: 0; }
@@ -84,10 +84,12 @@
       display: flex;
       height: calc(100vh - 52px);
       position: relative;
+      min-width: 0;
     }
     .sidebar {
-      width: 340px;
-      min-width: 340px;
+      width: 320px;
+      min-width: 280px;
+      max-width: 420px;
       background: #ffffff;
       border-right: 1px solid #e2e8f0;
       display: flex;
@@ -95,14 +97,92 @@
       overflow: hidden;
       position: relative;
       z-index: 4;
+      flex-shrink: 0;
     }
     .properties {
       padding: 14px;
       flex: 1 1 auto;
-      min-height: 80px;
+      min-height: 0;
       overflow-y: auto;
       border-bottom: none;
       background: #ffffff;
+    }
+    /* Card direito: histórico, validações e segurança */
+    .right-panel {
+      width: 340px;
+      min-width: 300px;
+      max-width: 480px;
+      background: #ffffff;
+      border-left: 1px solid #e2e8f0;
+      display: flex;
+      flex-direction: column;
+      overflow: hidden;
+      position: relative;
+      z-index: 4;
+      flex-shrink: 0;
+      transition: width 0.2s ease, min-width 0.2s ease, opacity 0.15s ease, border-color 0.15s;
+    }
+    body.right-panel-collapsed .right-panel {
+      width: 0;
+      min-width: 0;
+      opacity: 0;
+      border-left-color: transparent;
+      pointer-events: none;
+    }
+    .right-panel-header {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 8px;
+      padding: 8px 10px;
+      border-bottom: 1px solid #e2e8f0;
+      background: #f8fafc;
+      flex-shrink: 0;
+    }
+    .right-panel-header span {
+      font-size: 0.78rem;
+      font-weight: 700;
+      color: #334155;
+    }
+    .right-panel-header button {
+      padding: 4px 10px;
+      font-size: 0.72rem;
+      background: #e2e8f0;
+      color: #334155;
+    }
+    .right-panel-header button:hover {
+      background: #cbd5e1;
+      color: #1e293b;
+    }
+    .right-show-tab {
+      display: none;
+      position: absolute;
+      right: 0;
+      top: 50%;
+      z-index: 40;
+      writing-mode: vertical-rl;
+      text-orientation: mixed;
+      background: #1d4ed8;
+      color: #fff;
+      border: none;
+      border-radius: 8px 0 0 8px;
+      padding: 16px 9px;
+      font-size: 0.78rem;
+      font-weight: 600;
+      letter-spacing: 0.04em;
+      box-shadow: -2px 2px 12px rgba(15, 23, 42, 0.18);
+      cursor: pointer;
+      line-height: 1.2;
+      transform: translateY(-50%);
+    }
+    body.right-panel-collapsed .right-show-tab {
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+    }
+    .right-show-tab:hover { background: #1e40af; }
+    #btn-toggle-right {
+      margin-left: 4px;
     }
     .properties h3 {
       font-size: 0.95rem;
@@ -1050,7 +1130,7 @@
 <body>
   <div class="toolbar">
     <h1>🖧 Simulador de Topologia de Rede</h1>
-    <span id="app-version-badge" title="Versão publicada" style="font-size:0.68rem;font-weight:700;color:#0f766e;background:#ccfbf1;border:1px solid #99f6e4;border-radius:999px;padding:2px 8px;white-space:nowrap;">v2026-08-06 · painel</span>
+    <span id="app-version-badge" title="Versão publicada" style="font-size:0.68rem;font-weight:700;color:#0f766e;background:#ccfbf1;border:1px solid #99f6e4;border-radius:999px;padding:2px 8px;white-space:nowrap;">v2026-08-06 · monitor</span>
     <button id="btn-host">+ Host</button>
     <button id="btn-switch">+ Switch</button>
     <button id="btn-router">+ Roteador</button>
@@ -1073,6 +1153,8 @@
     <button id="btn-security" class="warn-btn" title="Audita senhas, Wi-Fi, firewall e atualizações">🔒 Segurança</button>
     <button id="btn-attack" class="danger" title="Teste didático: tenta obter o arquivo secreto do host (gancho para firewall)">🎯 Teste de invasão</button>
     <button id="btn-simulate">📤 Simular Mensagem</button>
+    <div class="toolbar-sep"></div>
+    <button id="btn-toggle-right" class="secondary" type="button" title="Esconder ou mostrar o painel direito (Ctrl+B)">☰ Monitor</button>
   </div>
 
   <div class="main">
@@ -1081,8 +1163,43 @@
         <p style="color:#64748b;font-size:0.85rem;">Selecione um dispositivo para configurar endereçamento IP, máscara e gateway.</p>
         <p class="hint">Dica: hosts (estático ou DHCP), servidor DHCP, roteadores, <strong>ISP (nuvem Internet)</strong> e switches (L2).</p>
       </div>
+    </div>
 
-      <div class="sidebar-splitter" id="split-props-log" title="Arraste para redimensionar" role="separator" aria-orientation="horizontal"></div>
+    <div class="canvas-container" id="canvas">
+      <div class="canvas-world" id="world">
+        <svg id="connections"></svg>
+        <div id="pdu" aria-hidden="true">
+          <div class="pdu-card">
+            <div class="pdu-type msg" id="pdu-type">Mensagem</div>
+            <div class="pdu-body" id="pdu-body">…</div>
+            <div class="pdu-layer" id="pdu-meta"></div>
+          </div>
+        </div>
+      </div>
+      <div class="connect-banner" id="connect-banner">
+        <span id="connect-banner-title">🔌 MODO LIGAÇÃO ATIVO</span>
+        <div class="step" id="connect-step">Clique no primeiro dispositivo</div>
+      </div>
+      <div id="transform-panel">
+        <div class="tf-header">
+          <h4 id="tf-title">Encapsulamento (origem)</h4>
+          <div class="playback-controls">
+            <button type="button" id="btn-sim-pause" class="secondary" title="Pausar (Espaço)">⏸</button>
+            <button type="button" id="btn-sim-play" class="secondary" title="Continuar (Espaço)" style="display:none">▶</button>
+            <button type="button" id="btn-sim-stop" class="danger" title="Parar simulação">⏹</button>
+          </div>
+        </div>
+        <div class="playback-status" id="playback-status"></div>
+        <div id="tf-steps"></div>
+      </div>
+    </div>
+
+    <button type="button" class="right-show-tab" id="btn-show-right" title="Mostrar painel de monitoramento (Ctrl+B)">‹ Monitor</button>
+    <aside class="right-panel" id="right-panel" aria-label="Monitoramento da rede">
+      <div class="right-panel-header">
+        <span>Monitoramento</span>
+        <button type="button" id="btn-hide-right" title="Esconder painel (Ctrl+B)">Esconder »</button>
+      </div>
 
       <div class="log-section" id="log-section">
         <h3>
@@ -1125,36 +1242,7 @@
           </div>
         </div>
       </div>
-    </div>
-
-    <div class="canvas-container" id="canvas">
-      <div class="canvas-world" id="world">
-        <svg id="connections"></svg>
-        <div id="pdu" aria-hidden="true">
-          <div class="pdu-card">
-            <div class="pdu-type msg" id="pdu-type">Mensagem</div>
-            <div class="pdu-body" id="pdu-body">…</div>
-            <div class="pdu-layer" id="pdu-meta"></div>
-          </div>
-        </div>
-      </div>
-      <div class="connect-banner" id="connect-banner">
-        <span id="connect-banner-title">🔌 MODO LIGAÇÃO ATIVO</span>
-        <div class="step" id="connect-step">Clique no primeiro dispositivo</div>
-      </div>
-      <div id="transform-panel">
-        <div class="tf-header">
-          <h4 id="tf-title">Encapsulamento (origem)</h4>
-          <div class="playback-controls">
-            <button type="button" id="btn-sim-pause" class="secondary" title="Pausar (Espaço)">⏸</button>
-            <button type="button" id="btn-sim-play" class="secondary" title="Continuar (Espaço)" style="display:none">▶</button>
-            <button type="button" id="btn-sim-stop" class="danger" title="Parar simulação">⏹</button>
-          </div>
-        </div>
-        <div class="playback-status" id="playback-status"></div>
-        <div id="tf-steps"></div>
-      </div>
-    </div>
+    </aside>
   </div>
 
   <div class="modal-overlay" id="modal">
@@ -6526,60 +6614,110 @@
     }
   }
 
-  // ========== SIDEBAR REDIMENSIONÁVEL ==========
-  const SIDEBAR_SPLIT_KEY = 'sft_redes_sidebar_split_v2';
-
+  // ========== PAINEL DIREITO (log / validações / segurança) ==========
+  const RIGHT_SPLIT_KEY = 'sft_redes_right_split_v1';
+  const RIGHT_COLLAPSED_KEY = 'sft_redes_right_collapsed_v1';
   const SPLITTER_H = 6;
   const MIN_PANEL = 56;
-  const PANEL_KEYS = ['props', 'log', 'val', 'sec'];
+  const RIGHT_KEYS = ['log', 'val', 'sec'];
 
-  function defaultSidebarSplits() {
-    // 4 painéis: propriedades, log, validações, segurança
-    return { props: 0.42, log: 0.18, val: 0.18, sec: 0.22 };
+  function isRightPanelCollapsed() {
+    return document.body.classList.contains('right-panel-collapsed');
   }
 
-  function normalizeSidebarSplits(s) {
-    const base = defaultSidebarSplits();
+  function updateRightPanelToggleUI() {
+    const collapsed = isRightPanelCollapsed();
+    const btn = document.getElementById('btn-toggle-right');
+    if (btn) {
+      btn.textContent = collapsed ? '☰ Mostrar monitor' : '☰ Esconder monitor';
+      btn.setAttribute('aria-pressed', collapsed ? 'true' : 'false');
+      btn.title = collapsed
+        ? 'Mostrar histórico, validações e segurança (Ctrl+B)'
+        : 'Esconder painel direito (Ctrl+B)';
+    }
+    const tab = document.getElementById('btn-show-right');
+    if (tab) tab.setAttribute('aria-hidden', collapsed ? 'false' : 'true');
+  }
+
+  function setRightPanelCollapsed(collapsed, { silent = false, persist = true } = {}) {
+    document.body.classList.toggle('right-panel-collapsed', !!collapsed);
+    if (persist) {
+      try { localStorage.setItem(RIGHT_COLLAPSED_KEY, collapsed ? '1' : '0'); } catch (_) {}
+    }
+    updateRightPanelToggleUI();
+    if (!silent) {
+      log(collapsed
+        ? 'Painel direito escondido. Use ‹ Monitor ou Ctrl+B para mostrar.'
+        : 'Painel direito visível (histórico, validações e segurança).', 'info');
+    }
+    if (!collapsed) {
+      setTimeout(() => {
+        try { window.dispatchEvent(new Event('resize')); } catch (_) {}
+      }, 60);
+    }
+  }
+
+  function toggleRightPanel() {
+    setRightPanelCollapsed(!isRightPanelCollapsed());
+  }
+
+  function loadRightPanelCollapsed() {
+    try {
+      const raw = localStorage.getItem(RIGHT_COLLAPSED_KEY);
+      setRightPanelCollapsed(raw === '1', { silent: true, persist: false });
+    } catch (_) {
+      setRightPanelCollapsed(false, { silent: true, persist: false });
+    }
+  }
+
+  function defaultRightSplits() {
+    return { log: 0.34, val: 0.28, sec: 0.38 };
+  }
+
+  function normalizeRightSplits(s) {
+    const base = defaultRightSplits();
     const out = { ...base };
-    PANEL_KEYS.forEach(k => {
+    RIGHT_KEYS.forEach(k => {
       if (typeof s?.[k] === 'number' && s[k] > 0) out[k] = s[k];
     });
-    // migração v1 (sem sec): fatia val antiga vira val+sec
-    if (s && typeof s.sec !== 'number' && typeof s.val === 'number') {
-      out.val = s.val * 0.45;
-      out.sec = s.val * 0.55;
+    if (s && typeof s.props === 'number' && typeof s.log === 'number') {
+      const sumOld = (s.log || 0) + (s.val || 0) + (s.sec || 0);
+      if (sumOld > 0.01) {
+        out.log = (s.log || 0) / sumOld;
+        out.val = (s.val || 0) / sumOld;
+        out.sec = (s.sec || 0) / sumOld;
+      }
     }
-    const sum = PANEL_KEYS.reduce((a, k) => a + out[k], 0);
-    if (sum <= 0.01) return defaultSidebarSplits();
-    PANEL_KEYS.forEach(k => { out[k] = out[k] / sum; });
+    const sum = RIGHT_KEYS.reduce((a, k) => a + out[k], 0);
+    if (sum <= 0.01) return defaultRightSplits();
+    RIGHT_KEYS.forEach(k => { out[k] = out[k] / sum; });
     return out;
   }
 
-  function loadSidebarSplits() {
+  function loadRightSplits() {
     try {
-      const raw = localStorage.getItem(SIDEBAR_SPLIT_KEY)
+      const raw = localStorage.getItem(RIGHT_SPLIT_KEY)
+        || localStorage.getItem('sft_redes_sidebar_split_v2')
         || localStorage.getItem('sft_redes_sidebar_split_v1');
-      if (!raw) return defaultSidebarSplits();
-      return normalizeSidebarSplits(JSON.parse(raw));
-    } catch (_) { /* ignore */ }
-    return defaultSidebarSplits();
+      if (!raw) return defaultRightSplits();
+      return normalizeRightSplits(JSON.parse(raw));
+    } catch (_) {}
+    return defaultRightSplits();
   }
 
-  function saveSidebarSplits(splits) {
-    try {
-      localStorage.setItem(SIDEBAR_SPLIT_KEY, JSON.stringify(splits));
-    } catch (_) { /* ignore */ }
+  function saveRightSplits(splits) {
+    try { localStorage.setItem(RIGHT_SPLIT_KEY, JSON.stringify(splits)); } catch (_) {}
   }
 
-  function getSidebarUsableHeight(sidebar) {
-    if (!sidebar) return 0;
-    const splitterCount = sidebar.querySelectorAll('.sidebar-splitter').length || 3;
-    return Math.max(0, sidebar.clientHeight - SPLITTER_H * splitterCount);
+  function getRightUsableHeight(panel) {
+    if (!panel) return 0;
+    const header = panel.querySelector('.right-panel-header');
+    const headerH = header ? header.offsetHeight : 0;
+    const splitterCount = panel.querySelectorAll('.sidebar-splitter').length || 2;
+    return Math.max(0, panel.clientHeight - headerH - SPLITTER_H * splitterCount);
   }
 
-  function enforceMinHeights(heights, usable, minH) {
-    const keys = PANEL_KEYS.slice();
-    // loop até todos >= min ou impossível
+  function enforceMinHeights(heights, usable, minH, keys) {
     for (let guard = 0; guard < 12; guard++) {
       let deficit = 0;
       keys.forEach(k => {
@@ -6598,11 +6736,9 @@
         if (heights[k] < minH) heights[k] = minH;
       });
     }
-    // corrige soma
     let sum = keys.reduce((a, k) => a + heights[k], 0);
     if (sum !== usable) {
       const diff = usable - sum;
-      // ajusta no maior painel
       let maxK = keys[0];
       keys.forEach(k => { if (heights[k] > heights[maxK]) maxK = k; });
       heights[maxK] = Math.max(minH, heights[maxK] + diff);
@@ -6610,137 +6746,98 @@
     return heights;
   }
 
-  function applySidebarSplits(splits) {
-    const sidebar = document.getElementById('sidebar');
-    const props = document.getElementById('properties');
+  function applyRightSplits(splits) {
+    const panel = document.getElementById('right-panel');
     const logSec = document.getElementById('log-section');
     const valSec = document.getElementById('validation-section');
     const secSec = document.getElementById('security-section');
-    if (!sidebar || !props || !logSec || !valSec || !secSec) return;
+    if (!panel || !logSec || !valSec || !secSec) return;
+    if (isRightPanelCollapsed()) return;
 
-    const usable = getSidebarUsableHeight(sidebar);
-    if (usable < MIN_PANEL * 4) return;
+    const usable = getRightUsableHeight(panel);
+    if (usable < MIN_PANEL * 3) return;
 
-    const norm = normalizeSidebarSplits(splits);
+    const norm = normalizeRightSplits(splits);
     let heights = {
-      props: Math.round(usable * norm.props),
       log: Math.round(usable * norm.log),
       val: Math.round(usable * norm.val),
       sec: 0
     };
-    heights.sec = usable - heights.props - heights.log - heights.val;
-    heights = enforceMinHeights(heights, usable, MIN_PANEL);
+    heights.sec = usable - heights.log - heights.val;
+    heights = enforceMinHeights(heights, usable, MIN_PANEL, RIGHT_KEYS);
 
     const apply = (el, h) => {
-      el.style.flex = `0 0 ${h}px`;
+      el.style.flex = '0 0 ' + h + 'px';
       el.style.height = h + 'px';
       el.style.minHeight = MIN_PANEL + 'px';
       el.style.maxHeight = h + 'px';
       el.style.overflow = 'hidden';
     };
-    apply(props, heights.props);
     apply(logSec, heights.log);
     apply(valSec, heights.val);
     apply(secSec, heights.sec);
 
-    const total = heights.props + heights.log + heights.val + heights.sec;
+    const total = heights.log + heights.val + heights.sec;
     if (total > 0) {
-      splits.props = heights.props / total;
       splits.log = heights.log / total;
       splits.val = heights.val / total;
       splits.sec = heights.sec / total;
     }
   }
 
-  function initSidebarResize() {
-    const sidebar = document.getElementById('sidebar');
-    const split1 = document.getElementById('split-props-log');
-    const split2 = document.getElementById('split-log-val');
-    const split3 = document.getElementById('split-val-sec');
-    if (!sidebar || !split1 || !split2 || !split3) return;
+  function initRightPanelResize() {
+    const panel = document.getElementById('right-panel');
+    const split1 = document.getElementById('split-log-val');
+    const split2 = document.getElementById('split-val-sec');
+    if (!panel || !split1 || !split2) return;
 
-    const splits = loadSidebarSplits();
-    applySidebarSplits(splits);
+    const splits = loadRightSplits();
+    applyRightSplits(splits);
 
     let drag = null;
 
-    function panelHeightsFromSplits(usable) {
-      const n = normalizeSidebarSplits(splits);
+    function heightsFromSplits(usable) {
+      const n = normalizeRightSplits(splits);
       let h = {
-        props: Math.round(usable * n.props),
         log: Math.round(usable * n.log),
         val: Math.round(usable * n.val),
         sec: 0
       };
-      h.sec = usable - h.props - h.log - h.val;
-      return enforceMinHeights(h, usable, MIN_PANEL);
+      h.sec = usable - h.log - h.val;
+      return enforceMinHeights(h, usable, MIN_PANEL, RIGHT_KEYS);
     }
 
     function onMove(e) {
       if (!drag) return;
-      const usable = getSidebarUsableHeight(sidebar);
-      if (usable < MIN_PANEL * 4) return;
-
-      const rect = sidebar.getBoundingClientRect();
-      const relY = e.clientY - rect.top;
-      const h = panelHeightsFromSplits(usable);
+      const usable = getRightUsableHeight(panel);
+      if (usable < MIN_PANEL * 3) return;
+      const rect = panel.getBoundingClientRect();
+      const header = panel.querySelector('.right-panel-header');
+      const headerH = header ? header.offsetHeight : 0;
+      const relY = e.clientY - rect.top - headerH;
+      const h = heightsFromSplits(usable);
 
       if (drag.which === 1) {
-        // props | log+val+sec
-        let hProps = Math.round(relY - SPLITTER_H / 2);
-        hProps = Math.max(MIN_PANEL, Math.min(hProps, usable - MIN_PANEL * 3));
-        const rest = usable - hProps;
-        const restRatio = drag.logRatio + drag.valRatio + drag.secRatio;
-        let hLog = restRatio > 0 ? Math.round(rest * (drag.logRatio / restRatio)) : Math.round(rest / 3);
-        let hVal = restRatio > 0 ? Math.round(rest * (drag.valRatio / restRatio)) : Math.round(rest / 3);
-        hLog = Math.max(MIN_PANEL, hLog);
-        hVal = Math.max(MIN_PANEL, hVal);
-        let hSec = rest - hLog - hVal;
-        if (hSec < MIN_PANEL) {
-          const need = MIN_PANEL - hSec;
-          hSec = MIN_PANEL;
-          if (hVal - need >= MIN_PANEL) hVal -= need;
-          else if (hLog - need >= MIN_PANEL) hLog -= need;
-          else {
-            hLog = Math.max(MIN_PANEL, Math.floor((rest - MIN_PANEL) / 2));
-            hVal = Math.max(MIN_PANEL, rest - MIN_PANEL - hLog);
-            hSec = rest - hLog - hVal;
-          }
-        }
-        splits.props = hProps / usable;
-        splits.log = hLog / usable;
-        splits.val = hVal / usable;
-        splits.sec = hSec / usable;
-      } else if (drag.which === 2) {
-        // props+log | val+sec  (splitter entre log e validações)
-        let hProps = Math.max(MIN_PANEL, Math.min(h.props, usable - MIN_PANEL * 3));
-        let hLog = Math.round(relY - hProps - SPLITTER_H - SPLITTER_H / 2);
-        hLog = Math.max(MIN_PANEL, Math.min(hLog, usable - hProps - MIN_PANEL * 2));
-        const rest = usable - hProps - hLog;
+        let hLog = Math.round(relY - SPLITTER_H / 2);
+        hLog = Math.max(MIN_PANEL, Math.min(hLog, usable - MIN_PANEL * 2));
+        const rest = usable - hLog;
         const pair = drag.valRatio + drag.secRatio;
         let hVal = pair > 0 ? Math.round(rest * (drag.valRatio / pair)) : Math.round(rest / 2);
         hVal = Math.max(MIN_PANEL, Math.min(hVal, rest - MIN_PANEL));
         const hSec = rest - hVal;
-        splits.props = hProps / usable;
         splits.log = hLog / usable;
         splits.val = hVal / usable;
         splits.sec = hSec / usable;
       } else {
-        // props+log+val | sec  (splitter entre validações e segurança)
-        let hProps = Math.max(MIN_PANEL, Math.min(h.props, usable - MIN_PANEL * 3));
-        let hLog = Math.max(MIN_PANEL, Math.min(h.log, usable - hProps - MIN_PANEL * 2));
-        // posição do 3º splitter
-        let hVal = Math.round(
-          relY - hProps - hLog - SPLITTER_H * 2 - SPLITTER_H / 2
-        );
-        hVal = Math.max(MIN_PANEL, Math.min(hVal, usable - hProps - hLog - MIN_PANEL));
-        const hSec = usable - hProps - hLog - hVal;
-        splits.props = hProps / usable;
+        let hLog = Math.max(MIN_PANEL, Math.min(h.log, usable - MIN_PANEL * 2));
+        let hVal = Math.round(relY - hLog - SPLITTER_H - SPLITTER_H / 2);
+        hVal = Math.max(MIN_PANEL, Math.min(hVal, usable - hLog - MIN_PANEL));
+        const hSec = usable - hLog - hVal;
         splits.log = hLog / usable;
         splits.val = hVal / usable;
         splits.sec = hSec / usable;
       }
-      applySidebarSplits(splits);
+      applyRightSplits(splits);
     }
 
     function onUp() {
@@ -6748,7 +6845,7 @@
       drag.el.classList.remove('active');
       document.body.classList.remove('sidebar-resizing');
       drag = null;
-      saveSidebarSplits(splits);
+      saveRightSplits(splits);
       document.removeEventListener('mousemove', onMove);
       document.removeEventListener('mouseup', onUp);
     }
@@ -6759,7 +6856,6 @@
       drag = {
         which,
         el,
-        logRatio: splits.log,
         valRatio: splits.val,
         secRatio: splits.sec
       };
@@ -6771,12 +6867,7 @@
 
     split1.addEventListener('mousedown', e => startDrag(1, split1, e));
     split2.addEventListener('mousedown', e => startDrag(2, split2, e));
-    split3.addEventListener('mousedown', e => startDrag(3, split3, e));
-
-    // título do splitter de segurança
-    split3.title = 'Arraste para redimensionar Segurança / Validações';
-
-    window.addEventListener('resize', () => applySidebarSplits(splits));
+    window.addEventListener('resize', () => applyRightSplits(splits));
   }
 
   // ========== EVENTOS ==========
@@ -6863,6 +6954,10 @@
   document.getElementById('btn-cancel-sim').onclick = closeModal;
   document.getElementById('btn-send-sim').onclick = simulateSend;
 
+  document.getElementById('btn-toggle-right').onclick = () => toggleRightPanel();
+  document.getElementById('btn-hide-right').onclick = () => setRightPanelCollapsed(true);
+  document.getElementById('btn-show-right').onclick = () => setRightPanelCollapsed(false);
+
   document.getElementById('btn-sim-pause').onclick = () => playback.pause();
   document.getElementById('btn-sim-play').onclick = () => playback.play();
   document.getElementById('btn-sim-stop').onclick = () => {
@@ -6939,6 +7034,12 @@
     if (!typing && (e.ctrlKey || e.metaKey) && e.key.toLowerCase() === 'a') {
       e.preventDefault();
       selectAllDevices();
+      return;
+    }
+
+    if (!typing && (e.ctrlKey || e.metaKey) && e.key.toLowerCase() === 'b') {
+      e.preventDefault();
+      toggleRightPanel();
       return;
     }
 
@@ -7024,7 +7125,8 @@
   // ========== INIT ==========
   loadLog();
   renderLog();
-  initSidebarResize();
+  initRightPanelResize();
+  loadRightPanelCollapsed();
   applyViewTransform();
 
   const restored = loadTopology();
