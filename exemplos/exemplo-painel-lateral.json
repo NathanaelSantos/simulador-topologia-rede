@@ -1,0 +1,120 @@
+{
+  "version": 2,
+  "savedAt": "2026-08-06T20:00:00.000Z",
+  "lab": {
+    "id": "demo-painel",
+    "titulo": "Exemplo — painel lateral",
+    "objetivo": "Teste esconder e mostrar o painel (☰ Painel, « Esconder, aba Painel › ou Ctrl+B).",
+    "sucesso": "Você escondeu e reabriu o painel sem perder a topologia."
+  },
+  "nextId": 6,
+  "devices": [
+    {
+      "id": "dev1",
+      "type": "host",
+      "x": 120,
+      "y": 160,
+      "label": "PC-Demo",
+      "ip": "192.168.10.10",
+      "mask": "255.255.255.0",
+      "gateway": "192.168.10.1",
+      "dns": "8.8.8.8",
+      "ipMode": "static",
+      "dhcpLease": null,
+      "dhcp": null,
+      "interfaces": null,
+      "security": {
+        "password": "Demo#2026x",
+        "updatesEnabled": true,
+        "firewallEnabled": true,
+        "publicWifiAllowed": false,
+        "secretFileName": "",
+        "secretFileContent": ""
+      }
+    },
+    {
+      "id": "dev2",
+      "type": "switch",
+      "x": 280,
+      "y": 280,
+      "label": "SW-Demo",
+      "ip": "",
+      "mask": null,
+      "gateway": "",
+      "dns": "",
+      "ipMode": null,
+      "dhcpLease": null,
+      "dhcp": null,
+      "interfaces": null,
+      "security": null
+    },
+    {
+      "id": "dev3",
+      "type": "router",
+      "x": 280,
+      "y": 420,
+      "label": "R-Demo",
+      "ip": "",
+      "mask": null,
+      "gateway": "",
+      "dns": "",
+      "ipMode": null,
+      "dhcpLease": null,
+      "dhcp": null,
+      "interfaces": [
+        { "name": "Gi0/0", "ip": "192.168.10.1", "mask": "255.255.255.0", "linkId": "lnk2" },
+        { "name": "Gi0/1", "ip": "", "mask": "255.255.255.0", "linkId": null },
+        { "name": "Gi0/2", "ip": "", "mask": "255.255.255.0", "linkId": null },
+        { "name": "Gi0/3", "ip": "", "mask": "255.255.255.0", "linkId": null }
+      ],
+      "security": {
+        "adminPassword": "Router#Demo99",
+        "updatesEnabled": true,
+        "firewallEnabled": true,
+        "wifiEnabled": true,
+        "wifiSsid": "Lab-Demo",
+        "wifiPassword": "Wifi#Demo2026",
+        "wifiProtocol": "wpa2",
+        "remoteAdmin": false
+      }
+    },
+    {
+      "id": "dev4",
+      "type": "host",
+      "x": 440,
+      "y": 160,
+      "label": "PC-2",
+      "ip": "192.168.10.20",
+      "mask": "255.255.255.0",
+      "gateway": "192.168.10.1",
+      "dns": "8.8.8.8",
+      "ipMode": "static",
+      "dhcpLease": null,
+      "dhcp": null,
+      "interfaces": null,
+      "security": {
+        "password": "Host2#2026x",
+        "updatesEnabled": true,
+        "firewallEnabled": true,
+        "publicWifiAllowed": false,
+        "secretFileName": "",
+        "secretFileContent": ""
+      }
+    }
+  ],
+  "links": [
+    { "id": "lnk1", "from": "dev1", "to": "dev2" },
+    { "id": "lnk2", "from": "dev2", "to": "dev3" },
+    { "id": "lnk3", "from": "dev4", "to": "dev2" }
+  ],
+  "regions": [
+    {
+      "id": "reg1",
+      "label": "LAN Demo",
+      "x": 300,
+      "y": 260,
+      "radius": 200,
+      "color": "#3b82f6"
+    }
+  ]
+}
