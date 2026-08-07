@@ -1250,9 +1250,9 @@
         <div id="security-list">
           <div class="val-item ok">
             <strong>Qualquer rede que vocês criarem:</strong>
-            1) Monte a topologia (hosts, switches, roteadores, ISP…) ·
-            2) No host: arquivo secreto + firewall OFF → 🎯 invasão deve obter o arquivo ·
-            3) Ligue o firewall do host → reteste (deve bloquear) ·
+            1) Monte a topologia (ISP, <strong>+ Firewall</strong> na borda, roteador/switch, hosts) ·
+            2) No host: arquivo secreto; filtragem do FW de borda OFF → 🎯 invasão obtém o arquivo ·
+            3) Ative a filtragem no <strong>Firewall de borda</strong> (ou o firewall do host) → reteste (deve bloquear) ·
             4) <strong>Auditar</strong> o checklist e exporte o <strong>Relatório</strong> se for entrega.
           </div>
         </div>
@@ -1283,22 +1283,23 @@
       <h2>🎯 Teste de invasão (didático)</h2>
       <p class="hint" style="margin-top:0;margin-bottom:12px">
         Funciona em <strong>qualquer rede</strong> que a turma montar (1 LAN, 2 sites + ISP, etc.).
-        Em cada PC: arquivo secreto + firewall. <strong>1º teste</strong> (firewall OFF) → invasão obtém o arquivo.
-        <strong>2º teste</strong> (firewall ON) → bloqueado.
+        Em cada PC: arquivo secreto. Preferência didática:
+        <strong>1º teste</strong> (sem proteção) → invasão obtém o arquivo ·
+        <strong>2º teste</strong> (filtragem no <strong>Firewall de borda</strong> ON, ou firewall do host) → bloqueado.
       </p>
       <label>Host-alvo (qualquer Host da topologia)</label>
       <select id="attack-target"></select>
       <p class="hint" id="attack-host-hint" style="margin-top:6px"></p>
       <div class="modal-actions" style="flex-wrap:wrap">
         <button class="secondary" id="btn-cancel-attack" type="button">Cancelar</button>
-        <button class="secondary" id="btn-prepare-secret" type="button" title="Cria um arquivo secreto de exemplo e deixa o firewall OFF neste host">📄 Preparar arquivo secreto</button>
+        <button class="secondary" id="btn-prepare-secret" type="button" title="Cria um arquivo secreto de exemplo e deixa o firewall do host OFF">📄 Preparar arquivo secreto</button>
         <button class="danger" id="btn-run-attack" type="button">Tentar obter o arquivo</button>
       </div>
       <div id="attack-result" class="attack-result" role="status"></div>
       <p class="hint">
-        Regra universal: <strong>firewall do host OFF</strong> → vermelho (rede falhou).
-        <strong>Firewall ON</strong> → verde (rede resiste).
-        Lab pronto opcional: <code>labs-seguranca/04-duas-redes-invasao.json</code> — mas o mesmo fluxo vale para a rede que <em>você</em> criar.
+        Ordem de defesa: <strong>1)</strong> Firewall de borda (ISP → FW → rede) ·
+        <strong>2)</strong> Firewall do host.
+        Sem os dois → vermelho (arquivo obtido). Com qualquer um ativo no caminho → verde.
       </p>
     </div>
   </div>
@@ -2605,14 +2606,10 @@
     if (d1.id === d2.id) {
       return { ok: false, msg: 'Não é possível conectar um dispositivo a ele mesmo.' };
     }
-    const allowed = CABLE_RULES[d1.type];
-    if (!allowed || !allowed.has(d2.type)) {
-      return {
-        ok: false,
-        msg: `Cabo inválido: ${d1.type} → ${d2.type} não é permitido. Use Host↔Switch, DHCP↔Switch, Switch↔Roteador, Firewall entre ISP e a rede, Roteador↔ISP ou ISP↔ISP (peering).`
-      };
+    // Mensagens didáticas antes da regra genérica
+    if ((d1.type === 'host' && d2.type === 'firewall') || (d1.type === 'firewall' && d2.type === 'host')) {
+      return { ok: false, msg: 'Firewall fica na borda da rede (antes do roteador/switch), não ligado direto no Host. Use: ISP → Firewall → Roteador/Switch → Hosts.' };
     }
-    // Host ↔ Host proibido explicitamente
     if (d1.type === 'host' && d2.type === 'host') {
       return { ok: false, msg: 'Não é permitido conectar Host → Host. Use um switch ou roteador entre eles.' };
     }
@@ -2622,8 +2619,12 @@
     if ((d1.type === 'host' && d2.type === 'dhcp') || (d1.type === 'dhcp' && d2.type === 'host')) {
       return { ok: false, msg: 'Não é permitido conectar Host → DHCP diretamente. Use um switch entre eles.' };
     }
-    if (d1.type === 'host' && d2.type === 'firewall' || d1.type === 'firewall' && d2.type === 'host') {
-      return { ok: false, msg: 'Firewall fica na borda da rede (antes do roteador/switch), não ligado direto no Host. Use: ISP → Firewall → Roteador/Switch → Hosts.' };
+    const allowed = CABLE_RULES[d1.type];
+    if (!allowed || !allowed.has(d2.type)) {
+      return {
+        ok: false,
+        msg: `Cabo inválido: ${d1.type} → ${d2.type} não é permitido. Use Host↔Switch, DHCP↔Switch, Switch↔Roteador, Firewall entre ISP e a rede, Roteador↔ISP ou ISP↔ISP (peering).`
+      };
     }
     return { ok: true };
   }
@@ -3188,19 +3189,24 @@
     const adj = buildAdj();
     const isps = state.devices.filter(d => d.type === 'isp');
 
+    // Com ISP: o tráfego externo entra pelo ISP — firewall ATIVO no caminho ISP → host
+    let sawIspPath = false;
     if (isps.length) {
       for (const isp of isps) {
         const path = findPath(isp.id, hostId, adj);
         if (!path || path.length < 2) continue;
+        sawIspPath = true;
         for (const id of path) {
           const d = getDevice(id);
           if (d && isPerimeterFirewallActive(d)) return d;
         }
       }
-      return null;
+      // Host alcançável pela Internet mas sem FW ativo no caminho → desprotegido na borda
+      if (sawIspPath) return null;
+      // ISP na topologia, mas este host não tem caminho até ele: cai no fallback abaixo
     }
 
-    // Sem ISP: ataque “de fora” — o primeiro firewall ativo alcançável a partir do host protege a rede
+    // Sem caminho ISP→host: ataque “de fora” — 1º firewall ativo alcançável a partir do host
     const visited = new Set([hostId]);
     const queue = [hostId];
     while (queue.length) {
@@ -3465,12 +3471,13 @@
       }
     });
 
-    // Se há hosts e nenhum roteador com firewall, reforça o tema
-    if (hosts.length && routers.length === 0) {
+    // Se há hosts sem roteador nem firewall de borda, reforça o tema de proteção na entrada
+    const hasPerimeterFw = state.devices.some(d => d.type === 'firewall');
+    if (hosts.length && routers.length === 0 && !hasPerimeterFw) {
       issues.push({
         level: 'warn',
         topic: 'Firewall',
-        msg: 'Não há roteador na topologia. Em redes reais o firewall de borda costuma ficar no roteador.',
+        msg: 'Não há roteador nem Firewall de borda. Em redes reais a filtragem fica na entrada (roteador/firewall antes da LAN).',
         devices: []
       });
     }
@@ -3657,11 +3664,20 @@
     const sec = ensureSecurity(host);
     const hasFile = !!(sec.secretFileName && String(sec.secretFileName).trim()
       && sec.secretFileContent && String(sec.secretFileContent).trim());
+    const perim = findActivePerimeterFirewallForHost(host.id);
+    let defenseHint;
+    if (perim) {
+      defenseHint = `borda ${perim.label} ON (deve bloquear na entrada)`;
+    } else if (sec.firewallEnabled) {
+      defenseHint = 'firewall do host ON (deve bloquear no PC)';
+    } else {
+      defenseHint = 'sem borda ativa nem firewall do host (invasão deve obter o arquivo)';
+    }
     const parts = [
       `Alvo: ${host.label}`,
       host.ip ? `IP ${host.ip}` : 'sem IP (não impede o teste de invasão)',
       hasFile ? `arquivo "${sec.secretFileName}"` : 'ainda sem arquivo secreto',
-      sec.firewallEnabled ? 'firewall ON (deve bloquear)' : 'firewall OFF (invasão deve obter o arquivo)'
+      defenseHint
     ];
     hint.innerHTML = parts.map(p => escapeHtml(p)).join(' · ');
   }
@@ -3688,14 +3704,14 @@
     saveTopology(true);
     refreshAttackTargetList(host.id);
     if (state.selectedId === host.id) renderProperties();
-    const msg = `${host.label}: arquivo secreto pronto e firewall OFF. Rode "Tentar obter o arquivo" (deve falhar a rede). Depois ligue o firewall e reteste.`;
+    const msg = `${host.label}: arquivo secreto pronto e firewall do host OFF. Rode "Tentar obter o arquivo" (sem proteção de borda deve falhar a rede). Depois ative o Firewall de borda (filtragem ON) ou o firewall do host e reteste.`;
     if (resultEl) {
       resultEl.className = 'attack-result show';
       resultEl.style.display = 'block';
       resultEl.innerHTML = `📄 ${escapeHtml(msg)}`;
       resultEl.classList.remove('fail', 'pass');
     }
-    log(`📄 Host ${host.label} preparado para invasão: "${sec.secretFileName}" · firewall OFF.`, 'action');
+    log(`📄 Host ${host.label} preparado para invasão: "${sec.secretFileName}" · firewall do host OFF.`, 'action');
     runSecurityAudit(false);
   }
 
@@ -5586,9 +5602,9 @@
             <input type="text" id="prop-sec-file-content" value="${escapeHtml(hSec.secretFileContent || '')}" placeholder="Ex.: dados confidenciais da equipe">
             <p class="hint" style="margin-top:6px">
               Vale para a topologia que <strong>vocês criarem</strong> (1 rede, 2 sites + ISP, etc.).
-              1) Crie o arquivo e deixe o firewall <strong>desmarcado</strong> → <strong>Salvar</strong> ·
-              2) <strong>🎯 Teste de invasão</strong> deve obter o arquivo (vermelho) ·
-              3) Marque o firewall → Salvar → reteste (verde).
+              1) Crie o arquivo (firewall do host desmarcado) → <strong>Salvar</strong> ·
+              2) <strong>🎯 Teste de invasão</strong> deve obter o arquivo se a borda também estiver OFF ·
+              3) Ative o <strong>Firewall de borda</strong> (filtragem) ou o firewall do host → reteste (verde).
             </p>
             ${breachNote}
           </div>
