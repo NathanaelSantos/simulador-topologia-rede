@@ -181,9 +181,6 @@
       justify-content: center;
     }
     .right-show-tab:hover { background: #1e40af; }
-    #btn-toggle-right {
-      margin-left: 4px;
-    }
     .properties h3 {
       font-size: 0.95rem;
       color: #1d4ed8;
@@ -1174,8 +1171,6 @@
     <button id="btn-security" class="warn-btn" title="Audita senhas, Wi-Fi, firewall e atualizações">🔒 Segurança</button>
     <button id="btn-attack" class="danger" title="Teste didático: tenta obter o arquivo secreto do host (gancho para firewall)">🎯 Teste de invasão</button>
     <button id="btn-simulate">📤 Simular Mensagem</button>
-    <div class="toolbar-sep"></div>
-    <button id="btn-toggle-right" class="secondary" type="button" title="Esconder ou mostrar o painel direito (Ctrl+B)">☰ Monitor</button>
   </div>
 
   <div class="main">
@@ -6940,14 +6935,6 @@
 
   function updateRightPanelToggleUI() {
     const collapsed = isRightPanelCollapsed();
-    const btn = document.getElementById('btn-toggle-right');
-    if (btn) {
-      btn.textContent = collapsed ? '☰ Mostrar monitor' : '☰ Esconder monitor';
-      btn.setAttribute('aria-pressed', collapsed ? 'true' : 'false');
-      btn.title = collapsed
-        ? 'Mostrar histórico, validações e segurança (Ctrl+B)'
-        : 'Esconder painel direito (Ctrl+B)';
-    }
     const tab = document.getElementById('btn-show-right');
     if (tab) tab.setAttribute('aria-hidden', collapsed ? 'false' : 'true');
   }
@@ -7269,7 +7256,6 @@
   document.getElementById('btn-cancel-sim').onclick = closeModal;
   document.getElementById('btn-send-sim').onclick = simulateSend;
 
-  document.getElementById('btn-toggle-right').onclick = () => toggleRightPanel();
   document.getElementById('btn-hide-right').onclick = () => setRightPanelCollapsed(true);
   document.getElementById('btn-show-right').onclick = () => setRightPanelCollapsed(false);
 
