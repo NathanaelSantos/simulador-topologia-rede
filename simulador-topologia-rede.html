@@ -6,16 +6,22 @@
   <meta http-equiv="Pragma" content="no-cache">
   <meta http-equiv="Expires" content="0">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <meta name="app-version" content="2026-08-06-monitor-dir">
+  <meta name="app-version" content="2026-08-07-save-bar-fix">
   <title>Simulador de Topologia de Rede - UC1</title>
   <style>
     * { box-sizing: border-box; margin: 0; padding: 0; }
+    html, body {
+      height: 100%;
+    }
     body {
       font-family: 'Segoe UI', system-ui, sans-serif;
       background: #ffffff;
       color: #1e293b;
       height: 100vh;
+      height: 100dvh;
       overflow: hidden;
+      display: flex;
+      flex-direction: column;
     }
     .toolbar {
       display: flex;
@@ -25,6 +31,8 @@
       background: #ffffff;
       border-bottom: 1px solid #e2e8f0;
       align-items: center;
+      flex-shrink: 0;
+      z-index: 20;
     }
     .toolbar h1 {
       font-size: 1.05rem;
@@ -82,9 +90,12 @@
     .save-status.dirty { color: #d97706; }
     .main {
       display: flex;
-      height: calc(100vh - 52px);
+      flex: 1 1 auto;
+      min-height: 0;
+      height: auto;
       position: relative;
       min-width: 0;
+      overflow: hidden;
     }
     .sidebar {
       width: 320px;
@@ -98,14 +109,66 @@
       position: relative;
       z-index: 4;
       flex-shrink: 0;
+      min-height: 0;
+      height: 100%;
     }
     .properties {
-      padding: 14px;
+      padding: 0;
+      flex: 1 1 auto;
+      min-height: 0;
+      overflow: hidden;
+      border-bottom: none;
+      background: #ffffff;
+      display: flex;
+      flex-direction: column;
+    }
+    /* Formulário rola; botão Salvar fica fixo na base do painel esquerdo */
+    .properties-scroll {
       flex: 1 1 auto;
       min-height: 0;
       overflow-y: auto;
-      border-bottom: none;
+      overflow-x: hidden;
+      padding: 14px 14px 12px;
+      -webkit-overflow-scrolling: touch;
+      scrollbar-gutter: stable;
+    }
+    .properties-save-bar {
+      flex: 0 0 auto;
+      z-index: 6;
+      padding: 10px 14px 12px;
       background: #ffffff;
+      border-top: 1px solid #e2e8f0;
+      box-shadow: 0 -6px 16px rgba(15, 23, 42, 0.06);
+    }
+    .properties-save-bar button {
+      width: 100%;
+    }
+    /* Telas vazias / dicas sem botão Salvar — só rolam se precisar */
+    .properties > p,
+    .properties > h3,
+    .properties > .hint,
+    .properties > .prop-actions {
+      margin-left: 14px;
+      margin-right: 14px;
+    }
+    .properties > p:first-child,
+    .properties > h3:first-child {
+      margin-top: 14px;
+    }
+    .properties:not(:has(.properties-scroll)) {
+      overflow-y: auto;
+      padding: 14px;
+    }
+    .properties:not(:has(.properties-scroll)) > p,
+    .properties:not(:has(.properties-scroll)) > h3,
+    .properties:not(:has(.properties-scroll)) > .hint,
+    .properties:not(:has(.properties-scroll)) > .prop-actions {
+      margin-left: 0;
+      margin-right: 0;
+    }
+    .properties:not(:has(.properties-scroll)) > p:first-child,
+    .properties:not(:has(.properties-scroll)) > h3:first-child {
+      margin-top: 0;
     }
     /* Card direito: histórico, validações e segurança */
     .right-panel {
@@ -117,6 +180,8 @@
       display: flex;
       flex-direction: column;
       overflow: hidden;
+      min-height: 0;
+      height: 100%;
       position: relative;
       z-index: 4;
       flex-shrink: 0;
@@ -384,7 +449,9 @@
     #log .action { color: #7c3aed; }
     #log .warn { color: #d97706; }
     .canvas-container {
-      flex: 1;
+      flex: 1 1 auto;
+      min-width: 0;
+      min-height: 0;
       position: relative;
       background: #ffffff;
       background-image:
@@ -693,6 +760,9 @@
     }
     .prop-actions button {
       width: 100%;
+    }
+    .properties .hint:last-child {
+      margin-bottom: 4px;
     }
     .ip-mode-row {
       display: flex;
@@ -5500,11 +5570,11 @@
         html += `<label style="margin-top:10px">Cor personalizada</label>
                  <input type="color" id="prop-region-color" value="${region.color || '#3b82f6'}">`;
         html += `<p class="hint">Arraste o quadrado para mover · puxador no canto inferior direito para redimensionar · <strong>Excluir</strong> ou tecla Delete remove.</p>`;
-        html += `<div class="prop-actions" style="margin-top:14px;">
-          <button type="button" id="btn-save-props" style="width:100%;">Salvar região</button>
-          <button type="button" id="btn-delete-region" class="danger" style="width:100%;">🗑 Excluir região</button>
-        </div>`;
-        panel.innerHTML = html;
+        panel.innerHTML = `<div class="properties-scroll">${html}</div>
+          <div class="properties-save-bar">
+            <button type="button" id="btn-save-props">Salvar região</button>
+            <button type="button" id="btn-delete-region" class="danger" style="margin-top:6px;width:100%;">🗑 Excluir região</button>
+          </div>`;
         document.getElementById('btn-save-props').onclick = () => {
           const live = getRegion(region.id) || region;
           const label = document.getElementById('prop-region-label').value.trim() || live.label;
@@ -5605,7 +5675,8 @@
       isp: 'ISP / nuvem Internet',
       firewall: 'firewall de borda'
     }[dev.type] || dev.type;
-    let html = `<h3>${dev.label} <span style="color:#64748b;font-weight:400;font-size:0.8rem;">(${typeLabel})</span></h3>`;
+    let html = `<div class="properties-scroll">`;
+    html += `<h3>${dev.label} <span style="color:#64748b;font-weight:400;font-size:0.8rem;">(${typeLabel})</span></h3>`;
     html += `<label>Nome do dispositivo</label>
              <input type="text" id="prop-label" value="${dev.label}">`;
 
@@ -5925,7 +5996,10 @@
       html += `<div id="prop-errors" class="prop-error"></div>`;
     }
 
-    html += `<button id="btn-save-props" style="width:100%;margin-top:14px;">Salvar Configuração</button>`;
+    html += `</div>
+      <div class="properties-save-bar">
+        <button type="button" id="btn-save-props">Salvar Configuração</button>
+      </div>`;
     panel.innerHTML = html;
     document.getElementById('btn-save-props').onclick = () => saveProperties(dev);
 
