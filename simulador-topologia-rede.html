@@ -3967,6 +3967,7 @@
       _saveTimer = null;
     }
     try {
+      finishActiveDrag({ persist: false });
       const data = serializeTopology();
       localStorage.setItem(STORAGE_KEY, JSON.stringify(data));
       state.lastSavedAt = data.savedAt;
@@ -4001,7 +4002,26 @@
     }
   }
 
+  /** Garante x/y/radius numéricos finitos (evita null/NaN no JSON → posição “volta” ao padrão). */
+  function normalizeRegionData(r, fallback = {}) {
+    const fbX = Number.isFinite(fallback.x) ? fallback.x : 280;
+    const fbY = Number.isFinite(fallback.y) ? fallback.y : 220;
+    const fbR = Number.isFinite(fallback.radius) ? fallback.radius : REGION_DEFAULT_R;
+    const x = Number(r?.x);
+    const y = Number(r?.y);
+    const radius = Number(r?.radius);
+    return {
+      id: r?.id,
+      label: (r?.label && String(r.label).trim()) || 'Região',
+      x: Number.isFinite(x) ? x : fbX,
+      y: Number.isFinite(y) ? y : fbY,
+      radius: Math.max(REGION_MIN_R, Math.min(REGION_MAX_R, Number.isFinite(radius) ? radius : fbR)),
+      color: r?.color || REGION_COLORS[0].hex
+    };
+  }
+
   function serializeTopology() {
+    // Se ainda estiver arrastando, a posição já está em state — só garante números válidos
     const data = {
       version: 2,
       savedAt: new Date().toISOString(),
@@ -4009,8 +4029,8 @@
       devices: state.devices.map(d => ({
         id: d.id,
         type: d.type,
-        x: d.x,
-        y: d.y,
+        x: Number.isFinite(Number(d.x)) ? Number(d.x) : 40,
+        y: Number.isFinite(Number(d.y)) ? Number(d.y) : 40,
         label: d.label,
         ip: d.ip,
         mask: d.mask,
@@ -4048,14 +4068,23 @@
         security: d.security ? { ...d.security } : null
       })),
       links: state.links.map(l => ({ id: l.id, from: l.from, to: l.to })),
-      regions: (state.regions || []).map(r => ({
-        id: r.id,
-        label: r.label,
-        x: r.x,
-        y: r.y,
-        radius: r.radius,
-        color: r.color
-      }))
+      regions: (state.regions || []).map(r => {
+        const n = normalizeRegionData(r);
+        // Mantém o objeto em memória alinhado com o que vai para o disco
+        r.x = n.x;
+        r.y = n.y;
+        r.radius = n.radius;
+        r.label = n.label;
+        r.color = n.color;
+        return {
+          id: n.id,
+          label: n.label,
+          x: n.x,
+          y: n.y,
+          radius: n.radius,
+          color: n.color
+        };
+      })
     };
     if (state.currentLab) data.lab = { ...state.currentLab };
     return data;
@@ -4067,6 +4096,8 @@
         clearTimeout(_saveTimer);
         _saveTimer = null;
       }
+      // Garante que arraste em andamento já gravou x/y em state antes do serialize
+      finishActiveDrag({ persist: false });
       const data = serializeTopology();
       localStorage.setItem(STORAGE_KEY, JSON.stringify(data));
       state.lastSavedAt = data.savedAt;
@@ -4146,14 +4177,7 @@
     });
     state.links = data.links.map(l => ({ id: l.id, from: l.from, to: l.to }));
     state.regions = Array.isArray(data.regions)
-      ? data.regions.map(r => ({
-          id: r.id,
-          label: r.label || 'Região',
-          x: typeof r.x === 'number' ? r.x : 280,
-          y: typeof r.y === 'number' ? r.y : 220,
-          radius: Math.max(REGION_MIN_R, Math.min(REGION_MAX_R, r.radius || REGION_DEFAULT_R)),
-          color: r.color || REGION_COLORS[0].hex
-        }))
+      ? data.regions.map(r => normalizeRegionData(r))
       : [];
     state.nextId = data.nextId || (state.devices.length + state.links.length + state.regions.length + 1);
     state.selectedId = null;
@@ -4191,14 +4215,16 @@
     const id = 'reg' + state.nextId++;
     const count = state.regions.length + 1;
     const color = REGION_COLORS[(count - 1) % REGION_COLORS.length].hex;
-    const region = {
+    const x = Number(atX);
+    const y = Number(atY);
+    const region = normalizeRegionData({
       id,
       label: 'Região ' + count,
-      x: typeof atX === 'number' ? atX : 220 + (count % 4) * 40,
-      y: typeof atY === 'number' ? atY : 180 + (count % 3) * 30,
+      x: Number.isFinite(x) ? x : 220 + (count % 4) * 40,
+      y: Number.isFinite(y) ? y : 180 + (count % 3) * 30,
       radius: REGION_DEFAULT_R,
       color
-    };
+    });
     state.regions.push(region);
     renderRegion(region);
     selectRegion(id);
@@ -4240,40 +4266,54 @@
     `;
     updateRegionPosition(region);
 
-    el.addEventListener('mousedown', e => {
+    el.addEventListener('pointerdown', e => {
       if (e.button !== 0) return;
       if (e.target.classList.contains('region-resize')) return;
       e.stopPropagation();
+      e.preventDefault();
       if (state.mode === 'connect' || state.mode === 'place-region') return;
       selectRegion(region.id);
+      const live = getRegion(region.id) || region;
       const world = screenToWorld(e.clientX, e.clientY);
       state.dragging = {
         type: 'region',
-        id: region.id,
-        startPos: { x: region.x, y: region.y },
+        id: live.id,
+        startPos: { x: live.x, y: live.y },
         startMouse: world,
-        moved: false
+        moved: false,
+        pointerId: e.pointerId
       };
+      try { el.setPointerCapture(e.pointerId); } catch (_) { /* ignore */ }
+      document.addEventListener('pointermove', onDrag);
+      document.addEventListener('pointerup', endDrag);
+      document.addEventListener('pointercancel', endDrag);
+      // fallback mouse (navegadores antigos)
       document.addEventListener('mousemove', onDrag);
       document.addEventListener('mouseup', endDrag);
     });
 
     const handle = el.querySelector('.region-resize');
-    handle.addEventListener('mousedown', e => {
+    handle.addEventListener('pointerdown', e => {
       if (e.button !== 0) return;
       e.stopPropagation();
       e.preventDefault();
       if (state.mode === 'connect' || state.mode === 'place-region') return;
       selectRegion(region.id);
+      const live = getRegion(region.id) || region;
       const world = screenToWorld(e.clientX, e.clientY);
       state.dragging = {
         type: 'region-resize',
-        id: region.id,
-        startRadius: region.radius,
+        id: live.id,
+        startRadius: live.radius,
         startMouse: world,
-        center: { x: region.x, y: region.y },
-        moved: false
+        center: { x: live.x, y: live.y },
+        moved: false,
+        pointerId: e.pointerId
       };
+      try { handle.setPointerCapture(e.pointerId); } catch (_) { /* ignore */ }
+      document.addEventListener('pointermove', onDrag);
+      document.addEventListener('pointerup', endDrag);
+      document.addEventListener('pointercancel', endDrag);
       document.addEventListener('mousemove', onDrag);
       document.addEventListener('mouseup', endDrag);
     });
@@ -5256,19 +5296,57 @@
     }
   }
 
-  function endDrag() {
+  /** Encerra arraste ativo; se persist=true, grava posição da região no localStorage. */
+  function finishActiveDrag({ persist = true } = {}) {
     const was = state.dragging;
-    if (was?.type === 'devices' && was.moved) markDirty();
-    if ((was?.type === 'region' || was?.type === 'region-resize') && was.moved) {
-      markDirty();
-      saveTopology(true); // posição/tamanho da região
+    if (!was) return null;
+
+    // Se moveu região, confirma números finitos no objeto de estado
+    if (was.type === 'region') {
+      const r = getRegion(was.id);
+      if (r) {
+        const changed = Math.abs(r.x - was.startPos.x) > 0.01 || Math.abs(r.y - was.startPos.y) > 0.01;
+        if (changed) was.moved = true;
+        const n = normalizeRegionData(r);
+        r.x = n.x;
+        r.y = n.y;
+        r.radius = n.radius;
+        updateRegionPosition(r);
+      }
+    } else if (was.type === 'region-resize') {
+      const r = getRegion(was.id);
+      if (r) {
+        if (Math.abs(r.radius - was.startRadius) > 0.01) was.moved = true;
+        const n = normalizeRegionData(r);
+        r.radius = n.radius;
+        updateRegionPosition(r);
+      }
     }
-    if (was?.type === 'pan') {
+
+    if (was.type === 'pan') {
       document.getElementById('canvas')?.classList.remove('panning');
     }
+
     state.dragging = null;
     document.removeEventListener('mousemove', onDrag);
     document.removeEventListener('mouseup', endDrag);
+    document.removeEventListener('pointermove', onDrag);
+    document.removeEventListener('pointerup', endDrag);
+    document.removeEventListener('pointercancel', endDrag);
+
+    if (was.type === 'devices' && was.moved) {
+      markDirty({ saveSoon: persist });
+      if (persist) saveTopology(true);
+    }
+    if ((was.type === 'region' || was.type === 'region-resize') && was.moved) {
+      markDirty({ saveSoon: false });
+      if (persist) saveTopology(true); // posição/tamanho da região
+    }
+    return was;
+  }
+
+  function endDrag() {
+    finishActiveDrag({ persist: true });
   }
 
   // ========== SELEÇÃO E PROPRIEDADES ==========
@@ -5428,18 +5506,30 @@
         </div>`;
         panel.innerHTML = html;
         document.getElementById('btn-save-props').onclick = () => {
-          const label = document.getElementById('prop-region-label').value.trim() || region.label;
+          const live = getRegion(region.id) || region;
+          const label = document.getElementById('prop-region-label').value.trim() || live.label;
           let sidePx = parseInt(document.getElementById('prop-region-side').value, 10);
-          if (Number.isNaN(sidePx)) sidePx = region.radius * 2;
+          if (Number.isNaN(sidePx)) sidePx = live.radius * 2;
           const radius = Math.max(REGION_MIN_R, Math.min(REGION_MAX_R, sidePx / 2));
-          const color = document.getElementById('prop-region-color').value || region.color;
-          region.label = label;
-          region.radius = radius;
-          region.color = color;
-          renderRegion(region);
+          const color = document.getElementById('prop-region-color').value || live.color;
+          // Preserva x/y atuais (arraste) e só atualiza nome/tamanho/cor
+          const n = normalizeRegionData({
+            ...live,
+            label,
+            radius,
+            color,
+            x: live.x,
+            y: live.y
+          });
+          live.label = n.label;
+          live.radius = n.radius;
+          live.color = n.color;
+          live.x = n.x;
+          live.y = n.y;
+          renderRegion(live);
           updateRegionSelectionUI();
-          log(`Região "${region.label}" atualizada.`, 'ok');
-          markDirty();
+          log(`Região "${live.label}" atualizada (posição ${Math.round(live.x)}, ${Math.round(live.y)}).`, 'ok');
+          markDirty({ saveSoon: false });
           saveTopology(true);
           renderProperties();
         };
