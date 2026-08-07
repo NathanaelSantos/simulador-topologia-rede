@@ -646,6 +646,26 @@
       font-size: 0.65rem;
       color: #0369a1;
     }
+    /* Firewall de borda — filtra entrada na rede */
+    .firewall .device-icon {
+      background: linear-gradient(145deg, #9a3412, #ea580c);
+      box-shadow: 0 4px 14px rgba(234, 88, 12, 0.35);
+      border: 1px solid #fb923c;
+      font-size: 1.7rem;
+      line-height: 1;
+    }
+    .firewall.fw-active .device-icon {
+      background: linear-gradient(145deg, #047857, #10b981);
+      box-shadow: 0 4px 14px rgba(16, 185, 129, 0.4);
+      border-color: #34d399;
+    }
+    .firewall .device-ip {
+      max-width: 140px;
+      font-size: 0.65rem;
+      font-weight: 600;
+    }
+    .firewall.fw-active .device-ip { color: #047857; }
+    .firewall:not(.fw-active) .device-ip { color: #c2410c; }
     /* Servidor DHCP (imgs/data-storage.png tem fundo preto) */
     .dhcp .device-icon {
       background: #0f172a;
@@ -1134,6 +1154,7 @@
     <button id="btn-host">+ Host</button>
     <button id="btn-switch">+ Switch</button>
     <button id="btn-router">+ Roteador</button>
+    <button id="btn-firewall" title="Firewall de borda — fica ANTES da rede; o tráfego externo passa por ele primeiro">+ Firewall</button>
     <button id="btn-isp" title="ISP / Nuvem Internet — interliga redes de clientes via WAN">+ ISP</button>
     <button id="btn-dhcp" title="Servidor DHCP — distribuição automática de IPs">+ DHCP</button>
     <button id="btn-region" class="secondary" title="Quadrado colorido só para marcar regiões (não afeta a rede). Clique no quadro para criar.">+ Região</button>
@@ -1295,11 +1316,13 @@
   /** Tipos que podem ser conectados entre si */
   const CABLE_RULES = {
     host:   new Set(['switch', 'router']),
-    switch: new Set(['host', 'switch', 'router', 'dhcp']),
-    router: new Set(['host', 'switch', 'router', 'dhcp', 'isp']),
+    switch: new Set(['host', 'switch', 'router', 'dhcp', 'firewall']),
+    router: new Set(['host', 'switch', 'router', 'dhcp', 'isp', 'firewall']),
     dhcp:   new Set(['switch', 'router']),
-    // ISP ↔ roteador (cliente) e ISP ↔ ISP (peering entre provedores)
-    isp:    new Set(['router', 'isp'])
+    // Firewall de borda: entre Internet (ISP) e a rede (router/switch)
+    firewall: new Set(['isp', 'router', 'switch', 'firewall']),
+    // ISP ↔ roteador (cliente), ISP ↔ firewall (borda) e ISP ↔ ISP (peering)
+    isp:    new Set(['router', 'isp', 'firewall'])
   };
 
   /** Roteador ou ISP: equipamentos de camada 3 com interfaces IP */
@@ -2400,14 +2423,14 @@
         if (isL3Device(dev) && n.type !== 'switch' && n.type !== 'host' && n.type !== 'dhcp' && n.id !== startId) {
           // a partir do L3, só inclui vizinhos diretos daquela "porta" no início
         }
-        // Atravessa apenas através de switches (e inclui hosts/routers no domínio)
-        if (n.type === 'switch') {
+        // Atravessa switches e firewall de borda (ponte filtrante)
+        if (n.type === 'switch' || n.type === 'firewall') {
           members.add(n.id);
           queue.push(n.id);
-        } else if (dev.type === 'switch' || id === startId) {
-          // hosts/routers ligados ao switch (ou vizinho direto do start)
+        } else if (dev.type === 'switch' || dev.type === 'firewall' || id === startId) {
+          // hosts/routers ligados ao switch/FW (ou vizinho direto do start)
           members.add(n.id);
-          if (n.type === 'switch') queue.push(n.id);
+          if (n.type === 'switch' || n.type === 'firewall') queue.push(n.id);
         }
       }
     }
@@ -2437,9 +2460,9 @@
           continue;
         }
         members.add(n.id);
-        if (n.type === 'switch') queue.push(n.id);
-        else if (n.type === 'host' && current.type === 'switch') {
-          // host no mesmo switch — já adicionado
+        if (n.type === 'switch' || n.type === 'firewall') queue.push(n.id);
+        else if (n.type === 'host' && (current.type === 'switch' || current.type === 'firewall')) {
+          // host no mesmo switch/firewall — já adicionado
         }
       }
     }
@@ -2591,7 +2614,7 @@
     if (!allowed || !allowed.has(d2.type)) {
       return {
         ok: false,
-        msg: `Cabo inválido: ${d1.type} → ${d2.type} não é permitido. Use Host↔Switch, DHCP↔Switch, Switch↔Roteador, Switch↔Switch, Roteador↔Roteador, Roteador↔ISP ou ISP↔ISP (peering).`
+        msg: `Cabo inválido: ${d1.type} → ${d2.type} não é permitido. Use Host↔Switch, DHCP↔Switch, Switch↔Roteador, Firewall entre ISP e a rede, Roteador↔ISP ou ISP↔ISP (peering).`
       };
     }
     // Host ↔ Host proibido explicitamente
@@ -2603,6 +2626,9 @@
     }
     if ((d1.type === 'host' && d2.type === 'dhcp') || (d1.type === 'dhcp' && d2.type === 'host')) {
       return { ok: false, msg: 'Não é permitido conectar Host → DHCP diretamente. Use um switch entre eles.' };
+    }
+    if (d1.type === 'host' && d2.type === 'firewall' || d1.type === 'firewall' && d2.type === 'host') {
+      return { ok: false, msg: 'Firewall fica na borda da rede (antes do roteador/switch), não ligado direto no Host. Use: ISP → Firewall → Roteador/Switch → Hosts.' };
     }
     return { ok: true };
   }
@@ -3129,11 +3155,18 @@
         remoteAdmin: true
       };
     }
+    if (type === 'firewall') {
+      return {
+        // Filtragem na borda: OFF = tráfego passa (invasão alcança a rede); ON = bloqueia entrada
+        enabled: false,
+        policy: 'inbound-block' // didático: bloqueia invasão de fora para dentro
+      };
+    }
     return null;
   }
 
   function ensureSecurity(dev) {
-    if (!dev || (dev.type !== 'host' && dev.type !== 'router')) return null;
+    if (!dev || (dev.type !== 'host' && dev.type !== 'router' && dev.type !== 'firewall')) return null;
     if (!dev.security || typeof dev.security !== 'object') {
       dev.security = defaultSecurity(dev.type);
     } else {
@@ -3141,6 +3174,55 @@
       dev.security = { ...base, ...dev.security };
     }
     return dev.security;
+  }
+
+  function isPerimeterFirewallActive(fw) {
+    if (!fw || fw.type !== 'firewall') return false;
+    const sec = ensureSecurity(fw);
+    return !!(sec && sec.enabled);
+  }
+
+  /**
+   * Para entrar na rede, o tráfego externo passa primeiro pelo firewall de borda.
+   * Com ISP: procura firewall ATIVO no caminho ISP → host.
+   * Sem ISP: se existe firewall ATIVO ligado na topologia alcançável a partir do host, ele protege a rede.
+   */
+  function findActivePerimeterFirewallForHost(hostId) {
+    const host = getDevice(hostId);
+    if (!host || host.type !== 'host') return null;
+    const adj = buildAdj();
+    const isps = state.devices.filter(d => d.type === 'isp');
+
+    if (isps.length) {
+      for (const isp of isps) {
+        const path = findPath(isp.id, hostId, adj);
+        if (!path || path.length < 2) continue;
+        for (const id of path) {
+          const d = getDevice(id);
+          if (d && isPerimeterFirewallActive(d)) return d;
+        }
+      }
+      return null;
+    }
+
+    // Sem ISP: ataque “de fora” — o primeiro firewall ativo alcançável a partir do host protege a rede
+    const visited = new Set([hostId]);
+    const queue = [hostId];
+    while (queue.length) {
+      const id = queue.shift();
+      for (const n of neighborsOf(id)) {
+        if (visited.has(n.id)) continue;
+        visited.add(n.id);
+        if (n.type === 'firewall') {
+          if (isPerimeterFirewallActive(n)) return n;
+          // desligado: tráfego atravessa e continua
+          queue.push(n.id);
+        } else {
+          queue.push(n.id);
+        }
+      }
+    }
+    return null;
   }
 
   /** Avalia senha: forte o suficiente para o laboratório de segurança básica. */
@@ -3239,14 +3321,15 @@
         });
       }
 
-      // Arquivo secreto sem firewall = rede falha no teste de invasão
+      // Arquivo secreto sem proteção de borda e sem firewall do host
       const hasSecret = !!(sec.secretFileName && String(sec.secretFileName).trim()
         && sec.secretFileContent && String(sec.secretFileContent).trim());
-      if (hasSecret && !sec.firewallEnabled) {
+      const perim = findActivePerimeterFirewallForHost(h.id);
+      if (hasSecret && !sec.firewallEnabled && !perim) {
         issues.push({
           level: 'err',
           topic: 'Firewall / arquivo secreto',
-          msg: `${h.label}: tem arquivo secreto "${sec.secretFileName}" mas o firewall está OFF — no teste de invasão o professor consegue o arquivo.`,
+          msg: `${h.label}: tem arquivo secreto "${sec.secretFileName}" sem firewall de borda ativo nem firewall no host — no teste de invasão o arquivo é obtido.`,
           devices: [h.id]
         });
       }
@@ -3256,6 +3339,26 @@
           topic: 'Teste de invasão',
           msg: `${h.label}: FALHOU no teste — arquivo "${sec.lastBreachStolen}" foi obtido. Ative o firewall e reteste.`,
           devices: [h.id]
+        });
+      }
+    });
+
+    // --- Firewall de borda ---
+    state.devices.filter(d => d.type === 'firewall').forEach(fw => {
+      const sec = ensureSecurity(fw);
+      if (!isConnected(fw.id)) {
+        issues.push({
+          level: 'warn',
+          topic: 'Firewall de borda',
+          msg: `${fw.label}: sem cabos. Posicione-o antes da rede (ISP → Firewall → Roteador/Switch).`,
+          devices: [fw.id]
+        });
+      } else if (!sec.enabled) {
+        issues.push({
+          level: 'err',
+          topic: 'Firewall de borda',
+          msg: `${fw.label}: filtragem desligada. Ative para bloquear invasões na entrada da rede.`,
+          devices: [fw.id]
         });
       }
     });
@@ -3462,7 +3565,7 @@
 
   function runSecurityAudit(logIssues = true) {
     state.devices.forEach(d => {
-      if (d.type === 'host' || d.type === 'router') ensureSecurity(d);
+      if (d.type === 'host' || d.type === 'router' || d.type === 'firewall') ensureSecurity(d);
     });
     const issues = validateSecurity();
     renderSecurity(issues, { logIssues });
@@ -3653,18 +3756,39 @@
       return;
     }
 
-    // 2) Firewall do host ligado → bloqueia (qualquer topologia)
+    // 2) Firewall de BORDA (antes da rede) — o tráfego externo passa por ele primeiro
+    const perimFw = findActivePerimeterFirewallForHost(host.id);
+    if (perimFw) {
+      sec.lastBreachAt = null;
+      sec.lastBreachStolen = null;
+      host.security = sec;
+      markDirty();
+      const msg = `Firewall de borda "${perimFw.label}" bloqueou a entrada na rede. O ataque nem chegou ao ${host.label}. Arquivo "${fileName}" protegido.`;
+      if (resultEl) {
+        resultEl.className = 'attack-result show pass';
+        resultEl.innerHTML = `✅ ${escapeHtml(msg)}<br><span style="font-weight:500;opacity:0.9">Como na vida real: para entrar na rede, o tráfego passa primeiro pelo firewall na borda (ISP → Firewall → rede interna).</span>`;
+      }
+      log(`🎯 Invasão BLOQUEADA na borda: ${perimFw.label} (filtragem ON) — ${host.label} não foi alcançado.`, 'ok');
+      document.getElementById(host.id)?.classList.remove('has-breach', 'has-security-issue');
+      document.getElementById(perimFw.id)?.classList.remove('has-security-issue');
+      runSecurityAudit(false);
+      saveTopology(true);
+      refreshAttackTargetList(host.id);
+      return;
+    }
+
+    // 3) Firewall do host (segunda linha de defesa)
     if (sec.firewallEnabled) {
       sec.lastBreachAt = null;
       sec.lastBreachStolen = null;
       host.security = sec;
       markDirty();
-      const msg = `Firewall do ${host.label} bloqueou o acesso. Arquivo "${fileName}" NÃO foi obtido. A rede que vocês planejaram resiste ao teste.`;
+      const msg = `Firewall do host ${host.label} bloqueou o acesso. Arquivo "${fileName}" NÃO foi obtido.`;
       if (resultEl) {
         resultEl.className = 'attack-result show pass';
-        resultEl.innerHTML = `✅ ${escapeHtml(msg)}<br><span style="font-weight:500;opacity:0.9">Compare com o 1º teste (sem firewall). Vale para qualquer rede montada no simulador.</span>`;
+        resultEl.innerHTML = `✅ ${escapeHtml(msg)}<br><span style="font-weight:500;opacity:0.9">Dica: o ideal é ter também o <strong>+ Firewall</strong> na borda (antes da rede). Host firewall é a proteção do PC.</span>`;
       }
-      log(`🎯 Invasão BLOQUEADA em ${host.label}: firewall ON — arquivo seguro.`, 'ok');
+      log(`🎯 Invasão BLOQUEADA no host ${host.label}: firewall do PC ON.`, 'ok');
       document.getElementById(host.id)?.classList.remove('has-breach', 'has-security-issue');
       runSecurityAudit(false);
       saveTopology(true);
@@ -3672,7 +3796,7 @@
       return;
     }
 
-    // 3) Firewall OFF → "invasor" obtém o arquivo (rede falhou) — qualquer host
+    // 4) Sem firewall de borda ativo e host sem firewall → invasão obtém o arquivo
     sec.lastBreachAt = new Date().toISOString();
     sec.lastBreachStolen = fileName;
     host.security = sec;
@@ -3683,14 +3807,19 @@
       ? fileContent.slice(0, 120) + '…'
       : fileContent;
 
+    const hasAnyFw = state.devices.some(d => d.type === 'firewall');
+    const nextStep = hasAnyFw
+      ? `Selecione o <strong>Firewall</strong> na borda → ☑ Filtragem ativa → <strong>Salvar</strong> → reteste (o ataque deve parar na entrada da rede).`
+      : `Adicione <strong>+ Firewall</strong> <em>antes</em> da rede (ex.: ISP → Firewall → Roteador/Switch), ligue a filtragem, <strong>Salve</strong> e reteste.`;
+
     const msg = `FALHOU — arquivo obtido de ${host.label}: "${fileName}". Conteúdo: ${stolenPreview}`;
     if (resultEl) {
       resultEl.className = 'attack-result show fail';
       resultEl.innerHTML = `❌ ${escapeHtml(msg)}<br><br>
-        <span style="font-weight:500">A rede que vocês criaram falhou no teste (sem firewall no host).</span><br>
-        <span style="font-weight:500;opacity:0.95"><strong>Próximo passo (qualquer topologia):</strong> selecione ${escapeHtml(host.label)} → ☑ Firewall do host ativo → <strong>Salvar</strong> → teste de novo.</span>`;
+        <span style="font-weight:500">A invasão entrou na rede (sem firewall de borda ativo e sem firewall no host).</span><br>
+        <span style="font-weight:500;opacity:0.95"><strong>Próximo passo:</strong> ${nextStep}</span>`;
     }
-    log(`🎯 Invasão BEM-SUCEDIDA em ${host.label}: arquivo "${fileName}" obtido (firewall OFF).`, 'err');
+    log(`🎯 Invasão BEM-SUCEDIDA em ${host.label}: arquivo "${fileName}" obtido (sem proteção na borda/host).`, 'err');
     log(`📄 Conteúdo roubado: ${stolenPreview}`, 'err');
     runSecurityAudit(false);
     saveTopology(true);
@@ -4263,7 +4392,7 @@
   function createDevice(type) {
     const id = 'dev' + state.nextId++;
     const count = state.devices.filter(d => d.type === type).length + 1;
-    const labels = { host: 'Host', switch: 'SW', router: 'R', dhcp: 'DHCP', isp: 'ISP' };
+    const labels = { host: 'Host', switch: 'SW', router: 'R', dhcp: 'DHCP', isp: 'ISP', firewall: 'FW' };
     let interfaces = null;
     if (type === 'router') {
       interfaces = [
@@ -4306,6 +4435,10 @@
       log('ISP (laboratório): ligue cabos e configure os IPs das portas PE manualmente (cliente ou peering).', 'info');
       log('Regra: nos dois lados do cabo, mesma sub-rede (ex. 200.0.0.1 e 200.0.0.2 /30). Auto /30 é opcional no painel.', 'info');
     }
+    if (type === 'firewall') {
+      log('Firewall de borda: posicione ANTES da rede (ex.: ISP → Firewall → Roteador/Switch → Hosts). Filtragem começa OFF.', 'info');
+      log('No teste de invasão, com filtragem ON o ataque para no firewall e não entra na rede.', 'info');
+    }
     markDirty();
     if (state.mode === 'connect') updateConnectUI();
   }
@@ -4316,7 +4449,8 @@
     dhcp: '<img src="imgs/data-storage.png?v=3" alt="Servidor DHCP" width="56" height="56" draggable="false">',
     switch: '<img src="imgs/network-switch.png" alt="Switch" draggable="false">',
     router: '<img src="imgs/roteador.png" alt="Roteador" draggable="false">',
-    isp: '☁️'
+    isp: '☁️',
+    firewall: '🛡️'
   };
 
   function renderDevice(dev) {
@@ -4325,7 +4459,8 @@
     if (old) old.remove();
 
     const el = document.createElement('div');
-    el.className = `device ${dev.type}`;
+    const fwOn = dev.type === 'firewall' && isPerimeterFirewallActive(dev);
+    el.className = `device ${dev.type}${fwOn ? ' fw-active' : ''}`;
     el.id = dev.id;
     el.style.left = dev.x + 'px';
     el.style.top = dev.y + 'px';
@@ -4375,6 +4510,9 @@
       } else {
         el.textContent = cfg.enabled ? 'sem IP' : 'off';
       }
+    } else if (dev.type === 'firewall') {
+      const sec = ensureSecurity(dev);
+      el.textContent = sec?.enabled ? 'filtragem ON' : 'filtragem OFF';
     } else if (dev.type === 'router' || dev.type === 'isp') {
       const configured = (dev.interfaces || []).filter(i => i.ip).map(i => i.ip);
       if (dev.type === 'isp') {
@@ -5352,7 +5490,8 @@
         <p class="hint" style="margin-top:8px;">✂ <strong>Desfazer cabo:</strong> clique no cabo (fica vermelho) + Excluir · ou duplo clique · ou botão direito · ou ligue de novo os mesmos dois no modo Conectar.</p>
         <p class="hint" style="margin-top:8px;">📦 <strong>DHCP:</strong> + DHCP → configure pool → no host, modo DHCP → Obter IP. Use Validar e Simular Mensagem para testar.</p>
         <p class="hint" style="margin-top:8px;">☁️ <strong>ISP (lab manual):</strong> ligue cabos → configure IP/máscara em cada PE e na WAN do roteador (mesma sub-rede). Peering = ISP↔ISP. Auto /30 só se quiser (botões no ISP).</p>
-        <p class="hint" style="margin-top:8px;">🔒 <strong>Segurança:</strong> em Host/Roteador configure senhas, Wi-Fi (WPA2/WPA3), firewall e atualizações → clique em <strong>🔒 Segurança</strong>. Falhas em vermelho; OK = rede segura no checklist básico. Labs: pasta <code>labs-seguranca/</code>.</p>
+        <p class="hint" style="margin-top:8px;">🛡️ <strong>Firewall de borda:</strong> + Firewall <em>antes</em> da rede (ISP → FW → Roteador/Switch). Filtragem ON = invasão para na entrada.</p>
+        <p class="hint" style="margin-top:8px;">🔒 <strong>Segurança:</strong> Host/Roteador (senhas, Wi-Fi, firewall do PC) + checklist <strong>🔒 Segurança</strong>. Labs: <code>labs-seguranca/</code>.</p>
         <p class="hint" style="margin-top:8px;">▢ <strong>Região:</strong> + Região → clique no quadro para criar o quadrado (Norte, Sul…). Só visual; arraste, redimensione ou exclua.</p>
         <p class="hint" style="margin-top:8px;">Zoom: scroll no quadro · Mover visão: arraste o fundo · Selecionar tudo: Ctrl+A</p>`;
       return;
@@ -5362,13 +5501,27 @@
       switch: 'switch',
       router: 'router',
       dhcp: 'servidor DHCP',
-      isp: 'ISP / nuvem Internet'
+      isp: 'ISP / nuvem Internet',
+      firewall: 'firewall de borda'
     }[dev.type] || dev.type;
     let html = `<h3>${dev.label} <span style="color:#64748b;font-weight:400;font-size:0.8rem;">(${typeLabel})</span></h3>`;
     html += `<label>Nome do dispositivo</label>
              <input type="text" id="prop-label" value="${dev.label}">`;
 
-    if (dev.type === 'host') {
+    if (dev.type === 'firewall') {
+      const fSec = ensureSecurity(dev);
+      html += `
+        <div class="security-box">
+          <h4>🛡️ Firewall de borda</h4>
+          <p class="hint">Coloque o firewall <strong>antes da rede</strong>: Internet/ISP → <strong>Firewall</strong> → Roteador ou Switch → Hosts. O tráfego externo passa por ele primeiro.</p>
+          <label class="check-row"><input type="checkbox" id="prop-fw-enabled" ${fSec.enabled ? 'checked' : ''}> Filtragem ativa (bloqueia invasão de fora)</label>
+          <p class="hint" style="margin-top:8px">
+            <strong>OFF:</strong> tráfego passa — teste de invasão pode alcançar os hosts.<br>
+            <strong>ON:</strong> ataque para no firewall e <em>não entra</em> na rede.
+          </p>
+        </div>
+        <div id="prop-errors" class="prop-error"></div>`;
+    } else if (dev.type === 'host') {
       const mode = dev.ipMode === 'dhcp' ? 'dhcp' : 'static';
       const ro = mode === 'dhcp' ? 'readonly' : '';
       html += `
@@ -5812,6 +5965,25 @@
       dev.label = newLabel;
       const labelEl = document.querySelector(`#${dev.id} .device-label`);
       if (labelEl) labelEl.textContent = newLabel;
+    }
+
+    if (dev.type === 'firewall') {
+      const fSec = ensureSecurity(dev);
+      fSec.enabled = !!document.getElementById('prop-fw-enabled')?.checked;
+      dev.security = fSec;
+      renderDevice(dev);
+      updateDeviceIpLabel(dev);
+      log(
+        fSec.enabled
+          ? `${dev.label}: filtragem ON — invasões de fora param na borda da rede.`
+          : `${dev.label}: filtragem OFF — tráfego externo passa para a rede interna.`,
+        fSec.enabled ? 'ok' : 'warn'
+      );
+      markDirty();
+      saveTopology(true);
+      renderProperties();
+      if (state.lastSecurityIssues) runSecurityAudit(false);
+      return;
     }
 
     if (dev.type === 'host') {
@@ -7019,6 +7191,7 @@
   document.getElementById('btn-host').onclick = () => addDeviceFromToolbar('host');
   document.getElementById('btn-switch').onclick = () => addDeviceFromToolbar('switch');
   document.getElementById('btn-router').onclick = () => addDeviceFromToolbar('router');
+  document.getElementById('btn-firewall').onclick = () => addDeviceFromToolbar('firewall');
   document.getElementById('btn-isp').onclick = () => addDeviceFromToolbar('isp');
   document.getElementById('btn-dhcp').onclick = () => addDeviceFromToolbar('dhcp');
   document.getElementById('btn-region').onclick = () => startPlaceRegionMode();
@@ -7031,7 +7204,7 @@
       setMode('connect');
       updateLinks();
       log('🔌 MODO LIGAÇÃO ATIVO — clique em dois dispositivos para criar o cabo entre eles.', 'action');
-      log('Regras: Host↔Switch, DHCP↔Switch, Switch↔Roteador, Switch↔Switch, Roteador↔Roteador, Roteador↔ISP, ISP↔ISP (peering). Host↔Host bloqueado.', 'info');
+      log('Regras: Host↔Switch, Firewall entre ISP e a rede (borda), Switch↔Roteador, Roteador↔ISP, ISP↔ISP. Host↔Host bloqueado.', 'info');
       log('Para DESFAZER: clique nos mesmos dois de novo, ou clique no cabo, ou botão direito no cabo.', 'info');
     }
   };
